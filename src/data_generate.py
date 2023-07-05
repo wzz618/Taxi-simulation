@@ -6,17 +6,21 @@ import geopandas as gpd
 import networkx as nx
 import pandas as pd
 
+import datatype
 import log_management
 
-name = 'data_generate'
+_name_ = 'data_generate'
 
 
 def Ceodata_Clean(config):
     """
         把地图文件进行清洗操作，并且保存清洗后的配置文件和图结构到原来的地址
         传入的地图需要包含的字段：OBJECTID，maxspeed
+
     :param config: 传入的配置文件
+
     :return:
+
     """
     crs_degree = config.get('MAP', 'crs_degree')  # 单位：度
     crs_metre = config.get('MAP', 'crs_metre')  # 单位：米
@@ -25,7 +29,7 @@ def Ceodata_Clean(config):
     weigh_propertion = float(config.get('MAP', 'weigh_propertion'))
     log_dir = config.get('LOG', 'dir_path')
 
-    log = log_management.log_management(log_dir, name)
+    log = log_management.log_management(log_dir, _name_)
     log.write_tip('地图地理数据处理')
     # ------------------------------- 读取地图 ---------------------------
     operation_name = '读取地图'
@@ -119,6 +123,22 @@ def Ceodata_Clean(config):
 
 
 def Orderdata_Clean(config):
+    """
+        把订单数据文件进行清洗操作，并且保存清洗后的配置文件和图结构到原来的地址
+        包括，找到订单数据OD点所在道路，并且把OD点坐标进行拟合
+
+        进行的清洗操作为
+        1.把地图进行投影，计算每个点的最近的线
+        2.根据点最近的线，进行拟合，获得拟合坐标的投影
+        3.把拟合坐标重新投影到原坐标系
+        4.把清洗后的订单数据文件进行覆盖保存操作
+        传入的地图需要包含的字段：OBJECTID，maxspeed
+
+    :param config: 传入的配置文件
+
+    :return:
+
+    """
     Gepdata_path = config.get('MAP', 'map_path')
     crs_degree = config.get('MAP', 'crs_degree')  # 单位：度
     crs_metre = config.get('MAP', 'crs_metre')  # 单位：米
@@ -126,14 +146,14 @@ def Orderdata_Clean(config):
     Orderdata_path = config.get('ORDERSHEET', 'path')
     log_dir = config.get('LOG', 'dir_path')
 
-    log = log_management.log_management(log_dir, name)
+    log = log_management.log_management(log_dir, _name_)
     log.write_tip('订单数据处理')
 
     # ------------------------------- 数据读入 ---------------------------
     operation_name = '数据读入'
     time_list = [time.perf_counter()]
     gdf_geodata = gpd.read_file(filename=Gepdata_path).to_crs(crs_metre)  # 道路地图数据
-    df_orderdata = pd.read_csv(Orderdata_path)  # 乘客订单数据
+    df_orderdata = pd.read_csv(Orderdata_path, low_memory=False)  # 乘客订单数据
     time_list.append(time.perf_counter())
     log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
 
@@ -147,16 +167,18 @@ def Orderdata_Clean(config):
     # 分类
     x_list = ['ON_LON', 'OFF_LON']
     y_list = ['ON_LAT', 'OFF_LAT']
-    road_list = ['fir_l_n', 'lst_l_n']
+    road_list = ['FIR_L_N', 'LST_L_N']
 
     for i in range(2):
         # 提取坐标列
         x_col = x_list[i]
         y_col = y_list[i]
 
-        geometry = gpd.points_from_xy(x=df_orderdata[x_list[i]], y=df_orderdata[y_list[i]], crs=crs_degree) \
+        # 提取坐标点
+        geometry = gpd.points_from_xy(x=df_orderdata[x_col], y=df_orderdata[y_col], crs=crs_degree) \
             .to_crs(crs_metre)
         points = gpd.GeoDataFrame(geometry=geometry)
+
         # 为每个点找到最近的线
         indices, distances = lines_sindex.nearest(points.geometry, return_distance=True, return_all=False)
 
@@ -164,12 +186,11 @@ def Orderdata_Clean(config):
         distance_mask = distances.T <= dis_mate
         df_orderdata.loc[indices.T[distance_mask, 0], road_list[i]] = [gdf_geodata.loc[road_idx, 'line_n'] for road_idx
                                                                        in indices.T[distance_mask, 1]]
-        points[road_list[i]] = df_orderdata[road_list[i]]
+        points[road_list[i]] = df_orderdata[road_list[i]].values
+
         # 删除找不到匹配项的点
-        df_orderdata = df_orderdata[df_orderdata[road_list[i]].notna()]
-        points = points[points[road_list[i]].notna()]
-        df_orderdata.reset_index(inplace=True, drop=True)
-        points.reset_index(inplace=True, drop=True)
+        df_orderdata = df_orderdata.dropna(subset=[road_list[i]]).reset_index(drop=True)
+        points = points.dropna(subset=[road_list[i]]).reset_index(drop=True)
         # 计算拟合坐标
         interpolated_points = [gdf_geodata.loc[row[road_list[i]], 'geometry'].interpolate(
             gdf_geodata.loc[row[road_list[i]], 'geometry'].project(row['geometry'])) for _, row in
@@ -177,12 +198,79 @@ def Orderdata_Clean(config):
 
         # 投影回经纬度坐标
         points = gpd.GeoSeries(interpolated_points, crs=crs_metre).to_crs(crs_degree)
-        df_orderdata[x_list[i]] = points.x
-        df_orderdata[y_list[i]] = points.y
+        df_orderdata[x_col] = points.x
+        df_orderdata[y_col] = points.y
 
     df_orderdata.to_csv(Orderdata_path, encoding='utf_8_sig', index=False)
     time_list.append(time.perf_counter())
     log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
+
+
+def Cardata_Generate_From_Orderdata(config):
+    """
+        从订单数据中提出初始的车辆数据信息
+        其中运行的时间比较长，超过1min
+
+    :param config:
+
+    :return:
+
+    """
+    operation_name = '车辆数据生成'
+    time_list = [time.perf_counter()]
+
+    Orderdata_path = config.get('ORDERSHEET', 'path')
+    Cardata_path = config.get('CACHE', 'cardata_path')
+    log_dir = config.get('LOG', 'dir_path')
+    log = log_management.log_management(log_dir, _name_)
+
+    # 读取订单数据信息
+    df_orderdata = pd.read_csv(Orderdata_path, low_memory=False)
+    # 生成初始的车辆数据信息
+    df_cardata = pd.DataFrame({key: pd.Series(dtype=value) for key, value in datatype.cardata.items()})
+
+    # 迭代更新
+    # 把初始的CAR_ID，CAR_NO，LON，LAT ，FIR_L_N， LST_L_N确认完成
+    cardata_index = 0
+    cardata_ini_list = []
+
+    # 排序
+    df_orderdata.sort_values(['CAR_NO', 'RN'], ascending=[True, True], inplace=True)
+    df_orderdata.reset_index(inplace=True)
+
+    # 从订单中获取车辆的初始信息
+    bf_car_no = False
+    for order_index in df_orderdata.index:
+        new_car = [cardata_index] + df_orderdata.loc[order_index, ['CAR_NO', 'ON_LON', 'ON_LAT', 'FIR_L_N', 'LST_L_N']] \
+            .values.tolist()
+        if not bf_car_no:
+            # 对初始的车辆信息进行生成
+            cardata_ini_list.append(new_car)
+            # 当前车辆的序列号和上一辆车的序号进行更改
+            cardata_index += 1
+            bf_car_no = new_car[1]
+        else:
+            if new_car[1] != bf_car_no:
+                # 如果车辆信息不同，则记录
+                cardata_ini_list.append(new_car)
+                cardata_index += 1
+                bf_car_no = new_car[1]
+            else:
+                # 否则跳过
+                pass
+
+    # 填充到车辆信息中
+    df_cardata[['CAR_ID', 'CAR_NO', 'LON', 'LAT', 'FIR_L_N', 'LST_L_N']] = cardata_ini_list
+    df_cardata.fillna(0, inplace=True)
+    df_cardata.to_csv(Cardata_path, index=False)
+
+    # 辅助信息
+    car_num = len(df_cardata)
+
+    time_list.append(time.perf_counter())
+    log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
+    log.write_data(f'共计检索到车辆信息{car_num}辆')
+    log.write_data(f'文件保存路径为{Cardata_path}')
 
 
 if __name__ == '__main__':
@@ -193,4 +281,4 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
-    Orderdata_Clean(config)
+    Cardata_Generate_From_Orderdata(config)
