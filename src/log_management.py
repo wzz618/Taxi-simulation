@@ -56,7 +56,9 @@ class log_management:
             if scale == 1:
                 tip = f'{40 * "*"} {tip} {40 * "*"}\n\t时间：{strftime("%Y-%m-%d %H:%M:%S")}\n'
             elif scale == 2:
-                tip = f'{30 * "-"} {tip} || {strftime("%Y-%m-%d %H:%M:%S")} {30 * "-"}\n'
+                tip = f'{20 * "-"} {tip} || {strftime("%Y-%m-%d %H:%M:%S")} {20 * "-"}\n'
+            elif scale == 3:
+                tip = f'{10 * ">"} {tip} @ {strftime("%Y-%m-%d %H:%M:%S")} {10 * "<"}\n'
             f.write(tip)
             if self.is_print:
                 print(tip, end='')

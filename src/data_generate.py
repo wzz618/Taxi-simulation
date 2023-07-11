@@ -1,3 +1,8 @@
+"""
+该模块主要用于把原始的订单、地图数据根据模拟器所需数据类型进行清洗，然后在清洗后的数据
+中提取必要的模拟器所需数据
+"""
+
 import pickle
 import time
 import warnings
@@ -8,13 +13,33 @@ import pandas as pd
 
 import datatype
 import log_management
+import visualize
 
 _name_ = 'data_generate'
 
 
+def Generate(config):
+    """
+    模拟器所需数据的生成方法
+
+    :param config:
+
+    :return:
+    """
+    log_dir = config.get('LOG', 'dir_path')
+    log = log_management.log_management(log_dir, _name_)
+    log.write_tip(_name_)
+    # 主要函数
+    Ceodata_Clean(config)
+    Orderdata_Clean(config)
+    Cardata_Generate_From_Orderdata(config)
+    Orderdata_Generate_From_Orderdata(config)
+    Gdata_Generate_From_Mapdata(config)
+
+
 def Ceodata_Clean(config):
     """
-        把地图文件进行清洗操作，并且保存清洗后的配置文件和图结构到原来的地址
+        把原始地图文件进行清洗操作，并且保存清洗后的配置文件和图结构到原来的地址
         传入的地图需要包含的字段：OBJECTID，maxspeed
 
     :param config: 传入的配置文件
@@ -22,6 +47,7 @@ def Ceodata_Clean(config):
     :return:
 
     """
+    operation_name = '地图地理数据处理'
     crs_degree = config.get('MAP', 'crs_degree')  # 单位：度
     crs_metre = config.get('MAP', 'crs_metre')  # 单位：米
     Gepdata_path = config.get('MAP', 'map_path')
@@ -30,7 +56,7 @@ def Ceodata_Clean(config):
     log_dir = config.get('LOG', 'dir_path')
 
     log = log_management.log_management(log_dir, _name_)
-    log.write_tip('地图地理数据处理')
+    log.write_tip(operation_name, scale=2)
     # ------------------------------- 读取地图 ---------------------------
     operation_name = '读取地图'
     time_list = [time.perf_counter()]
@@ -56,6 +82,7 @@ def Ceodata_Clean(config):
     time_list.append(time.perf_counter())
     df_crs_metre = gdf_geodata.to_crs(crs=crs_metre)
     gdf_geodata['shape_len'] = df_crs_metre.length  # 投影后的几何长度（单位是m）
+    gdf_geodata['time_len'] = gdf_geodata['shape_len'] / (gdf_geodata['maxspeed'] / 3.6)
     gdf_geodata['weight'] = round(gdf_geodata['shape_len'] / gdf_geodata['maxspeed'] * weigh_propertion)
     del df_crs_metre
 
@@ -124,8 +151,9 @@ def Ceodata_Clean(config):
 
 def Orderdata_Clean(config):
     """
-        把订单数据文件进行清洗操作，并且保存清洗后的配置文件和图结构到原来的地址
+        把原始订单数据文件进行清洗操作，并且保存清洗后的配置文件和图结构到原来的地址
         包括，找到订单数据OD点所在道路，并且把OD点坐标进行拟合
+        传入的订单需要包含的字段：ON_LON，ON_LAT, OFF_LON, OFF_LAT
 
         进行的清洗操作为
         1.把地图进行投影，计算每个点的最近的线
@@ -139,6 +167,7 @@ def Orderdata_Clean(config):
     :return:
 
     """
+    operation_name = '原始订单数据处理'
     Gepdata_path = config.get('MAP', 'map_path')
     crs_degree = config.get('MAP', 'crs_degree')  # 单位：度
     crs_metre = config.get('MAP', 'crs_metre')  # 单位：米
@@ -147,13 +176,13 @@ def Orderdata_Clean(config):
     log_dir = config.get('LOG', 'dir_path')
 
     log = log_management.log_management(log_dir, _name_)
-    log.write_tip('订单数据处理')
+    log.write_tip(operation_name, scale=2)
 
     # ------------------------------- 数据读入 ---------------------------
     operation_name = '数据读入'
     time_list = [time.perf_counter()]
     gdf_geodata = gpd.read_file(filename=Gepdata_path).to_crs(crs_metre)  # 道路地图数据
-    df_orderdata = pd.read_csv(Orderdata_path, low_memory=False)  # 乘客订单数据
+    df_orderdata = pd.read_csv(Orderdata_path, encoding='utf-8')  # 乘客订单数据
     time_list.append(time.perf_counter())
     log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
 
@@ -167,7 +196,7 @@ def Orderdata_Clean(config):
     # 分类
     x_list = ['ON_LON', 'OFF_LON']
     y_list = ['ON_LAT', 'OFF_LAT']
-    road_list = ['FIR_L_N', 'LST_L_N']
+    road_list = ['FIR_PT_N', 'LST_PT_N']
 
     for i in range(2):
         # 提取坐标列
@@ -210,19 +239,21 @@ def Cardata_Generate_From_Orderdata(config):
     """
         从订单数据中提出初始的车辆数据信息
         其中运行的时间比较长，超过1min
+        传入的订单需要包含的字段：'RN', 'CAR_NO','ON_LON', 'ON_LAT', 'FIR_L_N', 'GET_ON_TIME'
 
     :param config:
 
     :return:
 
     """
-    operation_name = '车辆数据生成'
+    operation_name = '模拟器车辆数据生成'
     time_list = [time.perf_counter()]
 
     Orderdata_path = config.get('ORDERSHEET', 'path')
     Cardata_path = config.get('CACHE', 'cardata_path')
     log_dir = config.get('LOG', 'dir_path')
     log = log_management.log_management(log_dir, _name_)
+    log.write_tip(operation_name, scale=2)
 
     # 读取订单数据信息
     df_orderdata = pd.read_csv(Orderdata_path, low_memory=False)
@@ -230,7 +261,7 @@ def Cardata_Generate_From_Orderdata(config):
     df_cardata = pd.DataFrame({key: pd.Series(dtype=value) for key, value in datatype.cardata.items()})
 
     # 迭代更新
-    # 把初始的CAR_ID，CAR_NO，LON，LAT ，FIR_L_N， LST_L_N确认完成
+    # 把初始的CAR_ID，CAR_NO，LON，LAT ，FIR_PT_N，LST_PT_N确认完成
     cardata_index = 0
     cardata_ini_list = []
 
@@ -240,8 +271,11 @@ def Cardata_Generate_From_Orderdata(config):
 
     # 从订单中获取车辆的初始信息
     bf_car_no = False
+    k = len(df_orderdata)
+    log.write_data(f'当前订单数据量为 {k} 行')
     for order_index in df_orderdata.index:
-        new_car = [cardata_index] + df_orderdata.loc[order_index, ['CAR_NO', 'ON_LON', 'ON_LAT', 'FIR_L_N', 'LST_L_N']] \
+        new_car = [cardata_index] + df_orderdata.loc[
+            order_index, ['CAR_NO', 'ON_LON', 'ON_LAT', 'FIR_PT_N', 'LST_PT_N']] \
             .values.tolist()
         if not bf_car_no:
             # 对初始的车辆信息进行生成
@@ -258,9 +292,10 @@ def Cardata_Generate_From_Orderdata(config):
             else:
                 # 否则跳过
                 pass
-
+        print("\r", "当前进度{}/{}".format(order_index + 1, k), end="", flush=True)
+    print()
     # 填充到车辆信息中
-    df_cardata[['CAR_ID', 'CAR_NO', 'LON', 'LAT', 'FIR_L_N', 'LST_L_N']] = cardata_ini_list
+    df_cardata[['CAR_ID', 'CAR_NO', 'LON', 'LAT', 'FIR_PT_N', 'LST_PT_N']] = cardata_ini_list
     df_cardata.fillna(0, inplace=True)
     df_cardata.to_csv(Cardata_path, index=False)
 
@@ -270,7 +305,130 @@ def Cardata_Generate_From_Orderdata(config):
     time_list.append(time.perf_counter())
     log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
     log.write_data(f'共计检索到车辆信息{car_num}辆')
-    log.write_data(f'文件保存路径为{Cardata_path}')
+    log.write_data(f'文件保存于{Cardata_path}')
+
+
+def Orderdata_Generate_From_Orderdata(config):
+    """
+        根据原始订单数据信息，提取生成模拟器所需的订单数据信息（datatype.py）
+        其中时间信息依据最小值进行修改
+        传入的订单需要包含的字段：'RN', 'ON_LON', 'ON_LAT', 'OFF_LON', 'OFF_LAT',
+        'FIR_PT_N', 'LST_PT_N', 'GET_ON_TIME', 'GET_OFF_TIME'
+
+    :param config:
+
+    :return:
+
+    """
+    operation_name = '模拟器订单数据提取'
+    time_list = [time.perf_counter()]
+
+    # 初始参数读入
+    Orderdata_in_path = config.get('ORDERSHEET', 'path')
+    Orderdata_out_path = config.get('CACHE', 'orderdata_path')
+    log_dir = config.get('LOG', 'dir_path')
+    log = log_management.log_management(log_dir, _name_)
+    log.write_tip(operation_name, scale=2)
+
+    # 初始表格读入
+    df_init_orderdata = pd.read_csv(Orderdata_in_path, encoding='utf-8')
+    df_out_orderdata = pd.DataFrame({key: pd.Series(dtype=value) for key, value in datatype.orderdata.items()})
+
+    # 把时间信息转化为s制
+    # 将时间字符串转换为 datetime 对象
+    df_init_orderdata['GET_ON_TIME'] = pd.to_datetime(df_init_orderdata['GET_ON_TIME'])
+    df_init_orderdata['GET_OFF_TIME'] = pd.to_datetime(df_init_orderdata['GET_OFF_TIME'])
+
+    # copy信息
+    df_out_orderdata[['CUS_ID', 'ON_LON', 'ON_LAT', 'OFF_LON', 'OFF_LAT', 'FIR_PT_N', 'LST_PT_N']] = \
+        df_init_orderdata[['RN', 'ON_LON', 'ON_LAT', 'OFF_LON', 'OFF_LAT', 'FIR_PT_N', 'LST_PT_N']]
+
+    # 计算每一行时间相对于第一行的秒数差
+    init_epoch = df_init_orderdata['GET_ON_TIME'].min()
+    df_out_orderdata['GET_ON_TIME'] = (df_init_orderdata['GET_ON_TIME'] - init_epoch) \
+        .dt.total_seconds()
+    # df_out_orderdata['GET_OFF_TIME'] = (df_init_orderdata['GET_OFF_TIME'] - init_epoch) \
+    #     .dt.total_seconds()
+
+    # 填充空余项
+    df_out_orderdata.fillna(0, inplace=True)
+    # 保存
+    df_out_orderdata.to_csv(Orderdata_out_path, index=False)
+
+    time_list.append(time.perf_counter())
+    log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
+    log.write_data(f'根据原始订单信息，已经提取到模拟器订单信息{len(df_out_orderdata)}行')
+    log.write_data(f'文件保存于{Orderdata_out_path}')
+
+
+def Gdata_Generate_From_Mapdata(config):
+    """
+        由于模拟器需要计算车辆的路径，通过图网络进行最短路径是有必要的，所以需要
+    为模拟器构建一个图网络（无向图）
+
+    :param config:
+
+    :return:
+
+    """
+    operation_name = '模拟器图网络数据构建'
+    time_list = [time.perf_counter()]
+
+    # 初始参数读入
+    Mapdata_path = config.get('MAP', 'map_path')
+    Gdata_path = config.get('CACHE', 'Gdata_path')
+    log_dir = config.get('LOG', 'dir_path')
+    log = log_management.log_management(log_dir, _name_)
+    log.write_tip(operation_name, scale=2)
+
+    gdf_geodata = gpd.read_file(filename=Mapdata_path)
+    gdf_geodata['weight'] = gdf_geodata['weight'].astype(int)
+    G = nx.Graph()
+
+    # 一些关键信息的列名
+    nodes_cols = ['fir_pt_n', 'lst_pt_n']
+    # key: nodes_col
+    # value: nodes_attrs
+    nodes_attrs_cols = [{'x': 'start_x', 'y': 'start_y'},
+                        {'x': 'end_x', 'y': 'end_y'}]
+    edgs_attrs_cols = ['shape_len', 'wgs84_len', 'fir_pt_n', 'lst_pt_n', 'line_n', 'weight']
+    for index, row in gdf_geodata.iterrows():
+        # 添加节点
+        G.add_node(row[nodes_cols[0]], **{attr: row[col] for attr, col in nodes_attrs_cols[0].items()})
+        G.add_node(row[nodes_cols[1]], **{attr: row[col] for attr, col in nodes_attrs_cols[1].items()})
+        # 添加边
+        G.add_edge(row[nodes_cols[1]], row[nodes_cols[1]], **{key: row[key] for key in edgs_attrs_cols})
+
+    # 保存数据
+    with open(Gdata_path, 'wb') as f:
+        pickle.dump(G, f)
+
+    # 数据输出
+    time_list.append(time.perf_counter())
+    log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
+    log.write_data(f'文件保存于{Gdata_path}')
+
+
+def Maplayer_Generate(config):
+    operation_name = '地图数据图层构建'
+    time_list = [time.perf_counter()]
+    # 前置准备
+    fig, ax = visualize.Mapdata_Layer(config)
+    # 初始参数读入
+    log_dir = config.get('LOG', 'dir_path')
+    maplayer_path = config.get('CACHE', 'maplayer_path')
+    map_layer_output = config.get('OUTPUT', 'map_layer_output')
+
+    log = log_management.log_management(log_dir, _name_)
+    log.write_tip(operation_name, scale=2)
+
+    # 保存数据
+    with open(maplayer_path, 'wb') as f:
+        pickle.dump(fig, f)
+    fig.savefig(map_layer_output, dpi=600, bbox_inches='tight')
+
+    time_list.append(time.perf_counter())
+    log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
 
 
 if __name__ == '__main__':
@@ -281,4 +439,4 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
-    Cardata_Generate_From_Orderdata(config)
+    Generate(config)
