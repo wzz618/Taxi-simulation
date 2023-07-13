@@ -127,9 +127,9 @@ def Ceodata_Clean(config):
                      [name_num for name_num in range(len(Undirected_graph.nodes))]))  # 创建nodes坐标和名字对应的数组
     nx.set_node_attributes(Undirected_graph, attrs, name='point_n')  # 为G的nodes增加字段point_n，根据字典赋值
     # 根据地理信息索引赋值
-    gdf_geodata['fir_p_n'] = gdf_geodata['geometry'].apply(
+    gdf_geodata['fir_pt_n'] = gdf_geodata['geometry'].apply(
         lambda geom: Undirected_graph.nodes[geom.coords[0]]['point_n'])
-    gdf_geodata['lst_p_n'] = gdf_geodata['geometry'].apply(
+    gdf_geodata['lst_pt_n'] = gdf_geodata['geometry'].apply(
         lambda geom: Undirected_graph.nodes[geom.coords[1]]['point_n'])
 
     time_list.append(time.perf_counter())
@@ -196,7 +196,9 @@ def Orderdata_Clean(config):
     # 分类
     x_list = ['ON_LON', 'OFF_LON']
     y_list = ['ON_LAT', 'OFF_LAT']
-    road_list = ['FIR_PT_N', 'LST_PT_N']
+    road_list = ['FIR_L_N', 'LST_L_N']
+    road_pt_list = [['ON_FIR_PT_N', 'ON_LST_PT_N'],
+                    ['OFF_FIR_PT_N', 'OFF_LST_PT_N']]
 
     for i in range(2):
         # 提取坐标列
@@ -230,6 +232,14 @@ def Orderdata_Clean(config):
         df_orderdata[x_col] = points.x
         df_orderdata[y_col] = points.y
 
+        # 计算道路端点
+        df_orderdata = pd.merge(df_orderdata, gdf_geodata[['line_n', 'fir_pt_n', 'lst_pt_n']],
+                                left_on=road_list[i], right_on='line_n', how='left').drop('line_n', axis=1)
+        df_orderdata = df_orderdata.rename(columns={'line_n': road_list[i],
+                                                    'fir_pt_n': road_pt_list[i][0],
+                                                    'lst_pt_n': road_pt_list[i][1]})
+    int_cols = road_list + road_pt_list[0] + road_pt_list[1]
+    df_orderdata[int_cols] = df_orderdata[int_cols].astype(int)
     df_orderdata.to_csv(Orderdata_path, encoding='utf_8_sig', index=False)
     time_list.append(time.perf_counter())
     log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
@@ -275,7 +285,7 @@ def Cardata_Generate_From_Orderdata(config):
     log.write_data(f'当前订单数据量为 {k} 行')
     for order_index in df_orderdata.index:
         new_car = [cardata_index] + df_orderdata.loc[
-            order_index, ['CAR_NO', 'ON_LON', 'ON_LAT', 'FIR_PT_N', 'LST_PT_N']] \
+            order_index, ['CAR_NO', 'ON_LON', 'ON_LAT', 'ON_FIR_PT_N', 'ON_LST_PT_N']] \
             .values.tolist()
         if not bf_car_no:
             # 对初始的车辆信息进行生成
@@ -340,8 +350,9 @@ def Orderdata_Generate_From_Orderdata(config):
     df_init_orderdata['GET_OFF_TIME'] = pd.to_datetime(df_init_orderdata['GET_OFF_TIME'])
 
     # copy信息
-    df_out_orderdata[['CUS_ID', 'ON_LON', 'ON_LAT', 'OFF_LON', 'OFF_LAT', 'FIR_PT_N', 'LST_PT_N']] = \
-        df_init_orderdata[['RN', 'ON_LON', 'ON_LAT', 'OFF_LON', 'OFF_LAT', 'FIR_PT_N', 'LST_PT_N']]
+    copy_cols = ['ON_LON', 'ON_LAT', 'OFF_LON', 'OFF_LAT', 'FIR_L_N', 'LST_L_N',
+                 'ON_FIR_PT_N', 'ON_LST_PT_N', 'OFF_FIR_PT_N', 'OFF_LST_PT_N']
+    df_out_orderdata[['CUS_ID'] + copy_cols] = df_init_orderdata[['RN'] + copy_cols]
 
     # 计算每一行时间相对于第一行的秒数差
     init_epoch = df_init_orderdata['GET_ON_TIME'].min()

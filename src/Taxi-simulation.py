@@ -36,6 +36,7 @@ class TaxiSimulation:
 
             # 乘客更新
             simulation_run.Customer_Appear(**self.__dict__)
+            simulation_run.Customer_Boarding(**self.__dict__)
 
             # 车辆寻客
             simulation_run.Customer_Destribution(**self.__dict__)

@@ -13,7 +13,7 @@ def Updata_G_nodes(
 ):
     """
     为图数据中更新出现的乘客点
-    :param nodes_data: dict, # CUS_ID, FIR_L_N, LST_L_N, ON_LON, ON_LAT
+    :param nodes_data: list[tuple], # CUS_ID, FIR_L_N, LST_L_N, ON_LON, ON_LAT
     :param nodes_notes: 实现 point_name=nodes_notes + CUS_ID
     :param kwargs: 模拟器的属性
     :return:
@@ -205,9 +205,11 @@ def Path_To_Task_path(G, path: list, weights: list):
             # 获取对应的边对象
             edge = G.edges[point1_name, point2_name]
             task_path[weight].append(task_path[weight][-1] + edge[weight])
+        # 保证最后一个为整数
+        task_path[weight][-1] = int(task_path[weight][-1])
+    # OD_loc
     start_pt = G.nodes[path[0]]
     end_pt = G.nodes[path[-1]]
-    # OD_loc
     task_path['OD_loc'] = [[start_pt['x'], start_pt['y']],
                            [end_pt['x'], end_pt['y']]]
     # OD_neighbors

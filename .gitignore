@@ -138,15 +138,8 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-!/ordersheet/20210414.csv
+!/ordersheet/
 
-!/map/西安市区20230507/西安市区20230507.cpg
-!/map/西安市区20230507/西安市区20230507.dbf
-!/map/西安市区20230507/西安市区20230507.pkl
-!/map/西安市区20230507/西安市区20230507.prj
-!/map/西安市区20230507/西安市区20230507.shp
-!/map/西安市区20230507/西安市区20230507.shx
+!/map/
 
-!/cache/cardata.csv
-!/cache/Gdata.pkl
-!/cache/orderdata.csv
+!/cache/
