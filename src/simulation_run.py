@@ -1,5 +1,6 @@
 import time
 
+import datatype
 import simulation_G
 
 _name_ = 'simulation_run'
@@ -200,12 +201,10 @@ def Vehicle_Operation(**kwargs):
     time_list = [time.perf_counter()]
     G = kwargs['_G_']
     now_time = kwargs['_now_time_']
+    log = kwargs['_log_']
     conn = kwargs['_conn_']
     cursor = kwargs['_cursor_']
-    ordertable = kwargs['_config_'].get('MYSQL', 'order_data')
     cartable = kwargs['_config_'].get('MYSQL', 'car_data')
-    prefix_car = kwargs['_config_'].get('G', 'prefix_car')
-    prefix_cus_O = kwargs['_config_'].get('G', 'prefix_cus_O')
     unit_time = kwargs['_config_'].get('PARAMETERS', 'unit_time')
 
     # 更新驶向乘客所在地的车辆信息，如果车辆到达则更新信息
@@ -232,7 +231,7 @@ def Vehicle_Operation(**kwargs):
             car_id = row[0]  # CAR_ID
             fir_pt_n = row[3]
             lst_pt_n = row[4]
-            if car_states == 1:
+            if car_state == 1:
                 runtime = now_time - row[5]
             else:
                 runtime = now_time - row[6]
@@ -293,8 +292,8 @@ def Vehicle_Operation(**kwargs):
                         # 计算更新后的坐标
                         new_lon, new_lat = simulation_G.Get_middle_nodes_location(fir_loc=fir_loc, lst_loc=lst_loc,
                                                                                   radio=radio)
-                        # (+)意味着在原有数值上面更改，否则是替换
                         if car_state == 1:
+                            # (+)意味着在原有数值上面更改，否则是替换
                             # LON, LAT, LOG_TIME, ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+), ALL_RUN_TIME(+),
                             # ALL_DH_TIME_P(+), TASK_ALL_MILEAGE(+), TASK_DH_MILEAGE(+), TASK_NOW_MILEAGE(+),
                             # CAR_ID
@@ -336,6 +335,7 @@ def Vehicle_Operation(**kwargs):
                                                                                   radio=radio)
                         # LON, LAT, FIR_PT_N, LST_PT_N,
                         if car_state == 1:
+                            # (+)意味着在原有数值上面更改，否则是替换
                             # FIR_PT_N, LST_PT_N
                             # LON, LAT, LOG_TIME, ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+), ALL_RUN_TIME(+),
                             # ALL_DH_TIME_P(+), TASK_ALL_MILEAGE(+), TASK_DH_MILEAGE(+), TASK_NOW_MILEAGE(+),
@@ -354,6 +354,8 @@ def Vehicle_Operation(**kwargs):
                                         travel['dis'], travel['dis'], travel['dis'],
                                         new_task_path_id - 1, car_id)
                         car_records_updata_road.append(new_data)
+                        # 更新完成，结束循环
+                        break
                 else:
                     # 上次运行的时间
                     runtime0 = runtime - travel['unit_time']
@@ -371,14 +373,61 @@ def Vehicle_Operation(**kwargs):
                         travel['time'] += t_dis
                         travel['dis'] += t_dis / move_time * (task_path['shape_len'][new_task_path_id] -
                                                               task_path['shape_len'][new_task_path_id - 1])
+                        x = task_path['OD_loc'][-1][0]
+                        y = task_path['OD_loc'][-1][1]
+                        fir_node = task_path['OD_neighbors'][-1][0]
+                        lst_node = task_path['OD_neighbors'][-1][1]
                         # 如果当前时间小于行驶到路口的总时间，则意味着在该道路中间
                         # 判断当前车辆是否更换道路
                         if car_state == 1:
+                            # (+)意味着在原有数值上面更改，否则是替换
                             # 意味着此时车辆抵达的目的地是乘客所在地
                             # cardata:
-                            # CAR_STATE, LOG_TIME, ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+),
+                            # CAR_STATE, LON, LAT,
+                            # FIR_PT_N, LST_PT_N, LOG_TIME,
+                            # ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+),
                             # ALL_RUN_TIME(+), ALL_DH_TIME_P(+),
                             # TASK_ALL_MILEAGE(+), TASK_DH_MILEAGE(+), TASK_NOW_MILEAGE(+)
                             # CAR_ID
-                            new_data = (2, now_time - t_dis, travel['dis'], travel['dis'])
-                            print()
+                            new_data = (3, x, y,
+                                        fir_node, lst_node, now_time - t_dis,
+                                        travel['dis'], travel['dis'],
+                                        travel['time'], travel['time'],
+                                        travel['dis'], travel['dis'], travel['dis'],
+                                        car_id)
+                            car_records_updata_task.append(new_data)
+                            # 此时循环结束，弹出
+                            break
+                        else:
+                            # 意味着此时车辆抵达了乘客目的地
+                            # car_data
+                            # CAR_STATE， LON, LAT,
+                            # FIR_PT_N, LST_PT_N, LOG_TIME,
+                            # ALL_RUN_MILEAGE(+), ALL_PMTD(+),
+                            # ALL_RUN_TIME(+), TASK_ALL_MILEAGE(+),
+                            # TASK_PMTD(+), TASK_NOW_MILEAGE(+)
+                            # CAR_ID
+                            new_data = (4, x, y,
+                                        fir_node, lst_node, now_time - t_dis,
+                                        travel['dis'], travel['dis'],
+                                        travel['time'], travel['dis'],
+                                        travel['dis'], travel['dis'],
+                                        car_id)
+                        car_records_updata_task.append(new_data)
+                    else:
+                        # 意味着此时车辆达到了任务路径的下一段道路
+                        pass
+        # 更新位置
+        sql = datatype.sql_vehicle_operation(cartable, 'updata_loc', car_state)
+        cursor.executemany(sql, car_records_updata_loc)
+        conn.commit()
+        # 更新道路
+        sql = datatype.sql_vehicle_operation(cartable, 'updata_road', car_state)
+        cursor.executemany(sql, car_records_updata_road)
+        conn.commit()
+        # 更新任务
+        sql = datatype.sql_vehicle_operation(cartable, 'updata_task', car_state)
+        cursor.executemany(sql, car_records_updata_task)
+        conn.commit()
+    time_list.append(time.perf_counter())
+    log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')

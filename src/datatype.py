@@ -46,3 +46,107 @@ orderdata = {
     'DH_MILEAGE': float,
     'PMTD': float,
 }
+
+
+def sql_vehicle_operation(sql_table: str, updata_type: str, car_state: int) -> str:
+    """
+        获得对应的sql查询语句
+        :param sql_table:
+        :param updata_type: updata_loc/updata_road/updata_task
+        :param car_state:
+    """
+    if updata_type == 'updata_loc':
+        # 仅仅更新车辆的坐标
+        if car_state == 1:
+            # 空驶里程
+            # (+)意味着在原有数值上面更改，否则是替换
+            # LON, LAT, LOG_TIME,
+            # ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+), ALL_RUN_TIME(+),
+            # ALL_DH_TIME_P(+), TASK_ALL_MILEAGE(+), TASK_DH_MILEAGE(+), TASK_NOW_MILEAGE(+),
+            # CAR_ID
+            sql = f"""
+                UPDATE {sql_table}
+                SET LON = %s, LAT = %s, LOG_TIME = %s,
+                    ALL_RUN_MILEAGE = ALL_RUN_MILEAGE + %s, ALL_DH_MILEAGE_P = ALL_DH_MILEAGE_P + %s, ALL_RUN_TIME = ALL_RUN_TIME + %s,
+                    ALL_DH_TIME_P = ALL_DH_TIME_P + %s, TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s, TASK_DH_MILEAGE = TASK_DH_MILEAGE + %s,
+                    TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s
+                WHERE CAR_ID = %s
+            """
+        else:
+            # 有效载客里程
+            # LON, LAT, LOG_TIME, ALL_RUN_MILEAGE(+), ALL_PMTD(+), ALL_RUN_TIME(+),
+            # TASK_ALL_MILEAGE(+), TASK_PMTD(+), TASK_NOW_MILEAGE(+),
+            # CAR_ID
+            sql = f"""
+                UPDATE {sql_table}
+                SET LON = %s, LAT = %s, LOG_TIME = %s,
+                    ALL_RUN_MILEAGE = ALL_RUN_MILEAGE + %s, ALL_PMTD = ALL_PMTD + %s, ALL_RUN_TIME = ALL_RUN_TIME + %s,
+                    TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s, TASK_PMTD = TASK_PMTD + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s
+                WHERE CAR_ID = %s
+            """
+    elif updata_type == 'updata_road':
+        # 更新道路
+        if car_state == 1:
+            # FIR_PT_N, LST_PT_N
+            # LON, LAT, LOG_TIME,
+            # ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+), ALL_RUN_TIME(+),
+            # ALL_DH_TIME_P(+), TASK_ALL_MILEAGE(+), TASK_DH_MILEAGE(+), TASK_NOW_MILEAGE(+),
+            # TASK_PATH_ID, CAR_ID
+            sql = f"""
+                UPDATE {sql_table}
+                SET FIR_PT_N = %s, LST_PT_N = %s, 
+                    LON = %s, LAT = %s, LOG_TIME = %s, 
+                    ALL_RUN_MILEAGE = ALL_RUN_MILEAGE + %s, ALL_DH_MILEAGE_P = ALL_DH_MILEAGE_P + %s, ALL_RUN_TIME = ALL_RUN_TIME + %s, 
+                    ALL_DH_TIME_P = ALL_DH_TIME_P + %s, TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s, TASK_DH_MILEAGE = TASK_DH_MILEAGE + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s, TASK_PATH_ID=%s 
+                WHERE CAR_ID = %s
+                """
+        else:
+            # FIR_PT_N, LST_PT_N
+            # LON, LAT, LOG_TIME,
+            # ALL_RUN_MILEAGE(+), ALL_PMTD(+), ALL_RUN_TIME(+),
+            # TASK_ALL_MILEAGE(+), TASK_PMTD(+), TASK_NOW_MILEAGE(+),
+            # TASK_PATH_ID, CAR_ID
+            sql = f"""
+                UPDATE {sql_table}
+                SET FIR_PT_N = %s, LST_PT_N = %s, 
+                    LON = %s, LAT = %s, LOG_TIME = %s, 
+                    ALL_RUN_MILEAGE = ALL_RUN_MILEAGE + %s, ALL_PMTD = ALL_PMTD + %s, ALL_RUN_TIME = ALL_RUN_TIME + %s,
+                    TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s, TASK_PMTD = TASK_PMTD + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s, 
+                WHERE CAR_ID = %s
+                """
+    else:
+        # 抵达该任务终点
+        if car_state == 1:
+            # # (+)意味着在原有数值上面更改，否则是替换
+            # CAR_STATE, LON, LAT,
+            # FIR_PT_N, LST_PT_N, LOG_TIME,
+            # ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+),
+            # ALL_RUN_TIME(+), ALL_DH_TIME_P(+),
+            # TASK_ALL_MILEAGE(+), TASK_DH_MILEAGE(+), TASK_NOW_MILEAGE(+)
+            # CAR_ID
+            sql = f"""
+                UPDATE {sql_table}
+                SET CAR_STATE = %s, LON = %s, LAT = %s,
+                    FIR_PT_N = %s, LST_PT_N = %s, LOG_TIME = %s,
+                    ALL_RUN_MILEAGE = ALL_RUN_MILEAGE + %s, ALL_DH_MILEAGE_P = ALL_DH_MILEAGE_P + %s,
+                    ALL_RUN_TIME = ALL_RUN_TIME + %s, ALL_DH_TIME_P = ALL_DH_TIME_P + %s,
+                    TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s, TASK_DH_MILEAGE = TASK_DH_MILEAGE + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s
+                WHERE CAR_ID = %s
+            """
+        else:
+            # CAR_STATE， LON, LAT,
+            # FIR_PT_N, LST_PT_N, LOG_TIME,
+            # ALL_RUN_MILEAGE(+), ALL_PMTD(+),
+            # ALL_RUN_TIME(+), TASK_ALL_MILEAGE(+),
+            # TASK_PMTD(+), TASK_NOW_MILEAGE(+),
+            # CAR_ID
+            sql = f"""
+                UPDATE {sql_table}
+                SET CAR_STATE = %s, LON = %s, LAT = %s,
+                    FIR_PT_N = %s, LST_PT_N = %s, LOG_TIME = %s,
+                    ALL_RUN_MILEAGE = ALL_RUN_MILEAGE + %s, ALL_PMTD = ALL_PMTD + %s,
+                    ALL_RUN_TIME = ALL_RUN_TIME + %s, TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s,
+                    TASK_PMTD = TASK_PMTD + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s
+                WHERE CAR_ID = %s
+            """
+    return sql
