@@ -7,7 +7,7 @@ _accuracy_ = 6
 
 
 def Updata_G_nodes(
-        nodes_data: list = None,
+        nodes_data: tuple = None,
         nodes_notes: str = '',
         **kwargs
 ):
@@ -46,8 +46,8 @@ def Compute_new_edges_attrs(
         G,
         point_loc: list,  # 节点的坐标
         point_name: str,  # 节点的名称
-        fir_point_name: str,  # 端点名1，必须是node
-        lst_point_name: str,  # 端点名2，必须是node
+        fir_point_name,  # 端点名1，必须是node
+        lst_point_name,  # 端点名2，必须是node
         log: object
 ):
     """
@@ -60,6 +60,8 @@ def Compute_new_edges_attrs(
     :param log: 日志对象
     :return: dict, 属性
     """
+    if fir_point_name == lst_point_name:
+        warnings.warn(f"fir_point_name‘{fir_point_name}’ can’t be same with lst_point_name‘{lst_point_name}’")
     fir_point = [G.nodes[fir_point_name]['x'],
                  G.nodes[fir_point_name]['y']]
     lst_point = [G.nodes[lst_point_name]['x'],
@@ -71,6 +73,7 @@ def Compute_new_edges_attrs(
     # 1: fst -> mid
     # 2: mid -> mid
     """
+    print(f"{fir_point_name}, {lst_point_name}")
     line_attrs = G[fir_point_name][lst_point_name]
     shape_len1 = line_attrs['shape_len'] * radio
     shape_len2 = line_attrs['shape_len'] - shape_len1

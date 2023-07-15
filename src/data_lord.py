@@ -107,4 +107,4 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
-    Lord(config)
+    Lord_Orderdata(config)

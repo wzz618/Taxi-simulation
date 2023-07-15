@@ -22,6 +22,7 @@ cardata = {
     'TASK_NOW_MILEAGE': float,
     'TASK_ACCEPTANCE_TIME': int,
     'TASK_GET_ON_TIME': int,
+    'TASK_GET_OFF_TIME': int,
     'TASK_PATH_ID': int,
 }
 
@@ -122,7 +123,8 @@ def sql_vehicle_operation(sql_table: str, updata_type: str, car_state: int) -> s
             # FIR_PT_N, LST_PT_N, LOG_TIME,
             # ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+),
             # ALL_RUN_TIME(+), ALL_DH_TIME_P(+),
-            # TASK_ALL_MILEAGE(+), TASK_DH_MILEAGE(+), TASK_NOW_MILEAGE(+)
+            # TASK_ALL_MILEAGE(+), TASK_DH_MILEAGE(+),
+            # TASK_NOW_MILEAGE(+), TASK_GET_ON_TIME
             # CAR_ID
             sql = f"""
                 UPDATE {sql_table}
@@ -130,7 +132,8 @@ def sql_vehicle_operation(sql_table: str, updata_type: str, car_state: int) -> s
                     FIR_PT_N = %s, LST_PT_N = %s, LOG_TIME = %s,
                     ALL_RUN_MILEAGE = ALL_RUN_MILEAGE + %s, ALL_DH_MILEAGE_P = ALL_DH_MILEAGE_P + %s,
                     ALL_RUN_TIME = ALL_RUN_TIME + %s, ALL_DH_TIME_P = ALL_DH_TIME_P + %s,
-                    TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s, TASK_DH_MILEAGE = TASK_DH_MILEAGE + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s
+                    TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s, TASK_DH_MILEAGE = TASK_DH_MILEAGE + %s, 
+                    TASK_GET_ON_TIME = %s
                 WHERE CAR_ID = %s
             """
         else:
@@ -139,6 +142,7 @@ def sql_vehicle_operation(sql_table: str, updata_type: str, car_state: int) -> s
             # ALL_RUN_MILEAGE(+), ALL_PMTD(+),
             # ALL_RUN_TIME(+), TASK_ALL_MILEAGE(+),
             # TASK_PMTD(+), TASK_NOW_MILEAGE(+),
+            # TASK_GET_OFF_TIME
             # CAR_ID
             sql = f"""
                 UPDATE {sql_table}
@@ -146,7 +150,8 @@ def sql_vehicle_operation(sql_table: str, updata_type: str, car_state: int) -> s
                     FIR_PT_N = %s, LST_PT_N = %s, LOG_TIME = %s,
                     ALL_RUN_MILEAGE = ALL_RUN_MILEAGE + %s, ALL_PMTD = ALL_PMTD + %s,
                     ALL_RUN_TIME = ALL_RUN_TIME + %s, TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s,
-                    TASK_PMTD = TASK_PMTD + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s
+                    TASK_PMTD = TASK_PMTD + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s, 
+                    TASK_GET_OFF_TIME = %s
                 WHERE CAR_ID = %s
             """
     return sql

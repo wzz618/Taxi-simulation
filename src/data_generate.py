@@ -233,11 +233,10 @@ def Orderdata_Clean(config):
         df_orderdata[y_col] = points.y
 
         # 计算道路端点
-        df_orderdata = pd.merge(df_orderdata, gdf_geodata[['line_n', 'fir_pt_n', 'lst_pt_n']],
-                                left_on=road_list[i], right_on='line_n', how='left').drop('line_n', axis=1)
-        df_orderdata = df_orderdata.rename(columns={'line_n': road_list[i],
-                                                    'fir_pt_n': road_pt_list[i][0],
-                                                    'lst_pt_n': road_pt_list[i][1]})
+        df_merged = pd.merge(df_orderdata[road_list[i]], gdf_geodata[['line_n', 'fir_pt_n', 'lst_pt_n']],
+                             left_on=road_list[i], right_on='line_n', how='left')
+        # 重命名赋值
+        df_orderdata[[road_list[i]] + road_pt_list[i]] = df_merged[['line_n', 'fir_pt_n', 'lst_pt_n']]
     int_cols = road_list + road_pt_list[0] + road_pt_list[1]
     df_orderdata[int_cols] = df_orderdata[int_cols].astype(int)
     df_orderdata.to_csv(Orderdata_path, encoding='utf_8_sig', index=False)
@@ -450,4 +449,4 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
-    Generate(config)
+    Orderdata_Generate_From_Orderdata(config)

@@ -23,11 +23,12 @@ class TaxiSimulation:
             self._G_ = pickle.load(f)  # 图网络数据
 
         # 模拟器状态
-        self._now_time_ = 0
+        self._now_time_ = int(self._config_.get('PARAMETERS', 'now_time'))
 
     def Run(self):
         # 程序模拟总时间间隔
         run_times = int(self._config_.get('PARAMETERS', 'run_times'))
+        unit_time = int(self._config_.get('PARAMETERS', 'unit_time'))
         # 按照时间间隔逐步迭代
         while self._now_time_ < run_times:
             # 当前进度提醒
@@ -36,12 +37,17 @@ class TaxiSimulation:
 
             # 乘客更新
             simulation_run.Customer_Appear(**self.__dict__)
-            simulation_run.Customer_Boarding(**self.__dict__)
 
             # 车辆寻客
             simulation_run.Customer_Destribution(**self.__dict__)
 
             # 模拟运行
+            simulation_run.Vehicle_Operation(**self.__dict__)
+            self._now_time_ += unit_time
+
+            # 上下客人
+            simulation_run.Customer_Boarding(**self.__dict__)
+            simulation_run.Customer_Arrival(**self.__dict__)
 
             # 更新状态
             self._now_time_ += 1

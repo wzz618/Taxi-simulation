@@ -23,7 +23,7 @@ def Customer_Appear(**kwargs):
     now_time = kwargs['_now_time_']
 
     # 执行更新语句
-    sql = f"UPDATE {ordertable} SET CUS_STATE = 1 WHERE APPEARANCE_TIME <= {now_time} AND APPEARANCE_TIME > {now_time - unit_time} AND"
+    sql = f"UPDATE {ordertable} SET CUS_STATE = 1 WHERE APPEARANCE_TIME <= {now_time} AND APPEARANCE_TIME > {now_time - unit_time}"
     cursor.execute(sql)
     # 提交更改
     conn.commit()
@@ -35,7 +35,152 @@ def Customer_Appear(**kwargs):
     if cus:
         simulation_G.Updata_G_nodes(nodes_data=cus, nodes_notes=prefix_cus_O, **kwargs)
     time_list.append(time.perf_counter())
-    log.write_data(f'{operation_name}完成，乘客人数{len(cus)}， 耗时 {time_list[-1] - time_list[-2]:.2f} s')
+    log.write_data(f'{operation_name}完成，乘客出现人数{len(cus)}， 耗时 {time_list[-1] - time_list[-2]:.2f} s')
+
+
+def Customer_Boarding(**kwargs):
+    """
+        乘客上车，并且告诉司机D点，司机进行路径规划
+        对模拟器中的乘客进行车辆分配
+        :param kwargs:
+        :return:
+        """
+    operation_name = '乘客上车数据更新'
+    time_list = [time.perf_counter()]
+    G = kwargs['_G_']
+    now_time = kwargs['_now_time_']
+    log = kwargs['_log_']
+    conn = kwargs['_conn_']
+    cursor = kwargs['_cursor_']
+    ordertable = kwargs['_config_'].get('MYSQL', 'order_data')
+    cartable = kwargs['_config_'].get('MYSQL', 'car_data')
+    prefix_cus_O = kwargs['_config_'].get('G', 'prefix_cus_O')
+    prefix_cus_D = kwargs['_config_'].get('G', 'prefix_cus_D')
+    weight_limit = float(kwargs['_config_'].get('PARAMETERS', 'search_length'))
+    # CAR_ID, LON, LAT
+    sql = f"SELECT TASK_CUS_ID FROM {cartable} WHERE CAR_STATE = 3"
+    cursor.execute(sql)
+    cus_ids = cursor.fetchall()
+    if cus_ids:
+        # 结果非空
+        # 提取 cus_ids 的值
+        cus_id_values = [row[0] for row in cus_ids]
+
+        # 构建参数化查询语句
+        sql = f"SELECT CUS_ID, OFF_FIR_PT_N, OFF_LST_PT_N, OFF_LON, OFF_LAT, CAR_ID FROM {ordertable} WHERE CUS_ID IN ({', '.join(['%s'] * len(cus_id_values))})"
+        cursor.execute(sql, cus_id_values)
+        cus_data = cursor.fetchall()
+        cus = tuple(tuple(item[:-1]) for item in cus_data)
+        # 如果有乘客可以登车则进行登车
+        update_cus_values = []
+        update_car_values = []
+        for row in cus_data:
+            # 把乘客目的地输入到图数据中
+            cus_id = row[0]
+            car_id = row[5]
+            cus_id_G_O = prefix_cus_O + cus_id
+            car_id_G_D = prefix_cus_D + row[5]
+            simulation_G.Updata_G_nodes(nodes_data=cus, nodes_notes=prefix_cus_D, **kwargs)
+            length, task_path = simulation_G.Get_Shortest_Car_To_Cus_Path(
+                G=G,
+                car_names=[cus_id_G_O],  # 符合条件的车辆编号们
+                cus_name=car_id_G_D,  # 目标乘客 cusa_name
+                weight='shape_len',  # 计算最短路径的权重名称，有三类（weight， shape_len， wgs84_length）
+                weight_limit=weight_limit,  # 计算最短路径的权重名称，有三类（weight， shape_len， wgs84_length）
+                **kwargs
+            )
+            # 有效载客距离
+            _, task_pmtd = task_path['shape_len'][-1]
+            _, task_time = task_path['time_len'][-1]
+            # 元组形式更新
+            # mysql table: orderdata cols
+            # CUS_STATE, GET_ON_TIME, DH_MILEAGE, CUS_ID
+            update_cus_values.append((3, now_time, task_pmtd, cus_id))
+            # mysql table: cardata cols
+            # CAR_STATE, TASK_PMTD, TASK_GET_ON_TIME, GET_OFF_TIME,TASK_PATH_ID, TASK_PATH, CAR_ID
+            update_car_values.append((2, task_pmtd, now_time, now_time + task_time, 0, task_path, car_id))
+        # orderdata
+        sql_update = f"UPDATE {ordertable} SET CUS_STATE = %s, GET_ON_TIME = %s, GET_OFF_TIME = %s, PMTD = %s WHERE CUS_ID = %s"
+        cursor.executemany(sql_update, update_cus_values)
+        conn.commit()
+        # cardata
+        sql_update = f"UPDATE {cartable} SET CAR_STATE = %s, TASK_PMTD = %s, TASK_GET_ON_TIME = %s, " \
+                     f"TASK_PATH_ID = %s, TASK_PATH = %s WHERE CAR_ID = %s"
+        cursor.executemany(sql_update, update_car_values)
+        conn.commit()
+    else:
+        pass
+    time_list.append(time.perf_counter())
+    log.write_data(f'{operation_name}完成，乘客上车人数{len(cus_ids)}， 耗时 {time_list[-1] - time_list[-2]:.2f} s')
+
+
+def Customer_Arrival(**kwargs):
+    """
+        乘客抵达目的地，结算当前订单
+        对模拟器中的到达乘客的订单数据进行修改，对车辆的数据继续修改
+    :param kwargs:
+    :return:
+    """
+    operation_name = '乘客下车数据更新'
+    time_list = [time.perf_counter()]
+    G = kwargs['_G_']
+    now_time = kwargs['_now_time_']
+    log = kwargs['_log_']
+    conn = kwargs['_conn_']
+    cursor = kwargs['_cursor_']
+    ordertable = kwargs['_config_'].get('MYSQL', 'order_data')
+    cartable = kwargs['_config_'].get('MYSQL', 'car_data')
+
+    # 构建参数化查询语句
+    # orderdata_table:
+    # TASK_CUS_ID, TASK_ALL_MILEAGE, TASK_PMTD, TASK_DH_MILEAGE, TASK_NOW_MILEAGE
+    # TASK_ACCEPTANCE_TIME, TASK_GET_ON_TIME
+    sql = f"""SELECT TASK_CUS_ID, TASK_PMTD, TASK_DH_MILEAGE, LOG_TIME FROM {cartable} WHERE CAR_STATE = 4"""
+    cursor.execute(sql)
+    car_records = cursor.fetchall()
+    if car_records:
+        # 结果非空
+
+        # 参数化查询语句
+        # orderdata_table:
+        # CUS_STATE, APPEARANCE_TIME, ACCEPTANCE_TIME, GET_ON_TIME, GET_OFF_TIME, DH_MILEAGE, PMTD
+        # TASK_ACCEPTANCE_TIME, TASK_GET_ON_TIME
+        update_cus_values = []
+        for row in car_records:
+            # 把乘客目的地输入到图数据中
+            cus_id = row[0]
+            pmtd = row[1]
+            dh_mileage = row[2]
+            log_time = row[3]
+
+            # 元组形式更新
+            # mysql table: orderdata cols
+            # CUS_STATE, GET_OFF_TIME, DH_MILEAGE, PMTD, CUS_ID
+            update_cus_values.append((4, log_time, dh_mileage, pmtd, cus_id))
+        # orderdata
+        sql_update = f"UPDATE {ordertable} " \
+                     f"SET CUS_STATE = %s, GET_OFF_TIME = %s, DH_MILEAGE = %s, PMTD = %s " \
+                     f"WHERE CUS_ID = %s"
+        cursor.executemany(sql_update, update_cus_values)
+        conn.commit()
+        # cardata
+        # CAR_STATE, TASK_CUS_ID, TASK_ALL_MILEAGE,
+        # TASK_PMTD, TASK_DH_MILEAGE, TASK_NOW_MILEAGE
+        # TASK_ACCEPTANCE_TIME, TASK_GET_ON_TIME, TASK_GET_OFF_TIME, TASK_PATH_ID, TASK_PATH
+        sql_update = f"""
+                    UPDATE {cartable} 
+                    SET CAR_STATE = 0, TASK_CUS_ID=0, TASK_ALL_MILEAGE = 0, 
+                        TASK_PMTD = 0, TASK_DH_MILEAGE=0, TASK_NOW_MILEAGE = 0, 
+                        TASK_ACCEPTANCE_TIME = 0, TASK_GET_ON_TIME=0, TASK_GET_OFF_TIME = 0, 
+                        TASK_PATH_ID = 0, TASK_GET_OFF_TIME = NULL 
+                    WHERE CAR_STATE = 4
+                """
+        cursor.execute(sql_update)
+        conn.commit()
+    else:
+        pass
+    time_list.append(time.perf_counter())
+    log.write_data(f'{operation_name}完成，乘客下车人数{len(car_records)}， 耗时 {time_list[-1] - time_list[-2]:.2f} s')
 
 
 def Customer_Destribution(**kwargs):
@@ -121,82 +266,16 @@ def Customer_Destribution(**kwargs):
     log.write_data(f'{operation_name}完成，乘客人数{len(update_cus_values)}， 耗时 {time_list[-1] - time_list[-2]:.2f} s')
 
 
-def Customer_Boarding(**kwargs):
-    """
-        乘客上车，并且告诉司机D点，司机进行路径规划
-        对模拟器中的乘客进行车辆分配
-        :param kwargs:
-        :return:
-        """
-    operation_name = '乘客上车数据更新'
-    time_list = [time.perf_counter()]
-    G = kwargs['_G_']
-    now_time = kwargs['_now_time_']
-    log = kwargs['_log_']
-    conn = kwargs['_conn_']
-    cursor = kwargs['_cursor_']
-    ordertable = kwargs['_config_'].get('MYSQL', 'order_data')
-    cartable = kwargs['_config_'].get('MYSQL', 'car_data')
-    prefix_cus_O = kwargs['_config_'].get('G', 'prefix_cus_O')
-    prefix_cus_D = kwargs['_config_'].get('G', 'prefix_cus_D')
-    weight_limit = float(kwargs['_config_'].get('PARAMETERS', 'search_length'))
-    # CAR_ID, LON, LAT
-    sql = f"SELECT TASK_CUS_ID FROM {cartable} WHERE CAR_STATE = 3"
-    cursor.execute(sql)
-    cus_ids = cursor.fetchall()
-    if cus_ids:
-        # 结果非空
-        # 提取 cus_ids 的值
-        cus_id_values = [row[0] for row in cus_ids]
-
-        # 构建参数化查询语句
-        sql = f"SELECT CUS_ID, OFF_FIR_PT_N, OFF_LST_PT_N, OFF_LON, OFF_LAT, CAR_ID FROM {ordertable} WHERE CUS_ID IN ({', '.join(['%s'] * len(cus_id_values))})"
-        cursor.execute(sql, cus_id_values)
-        cus_data = cursor.fetchall()
-        cus = [row[:-1] for row in cus_data]
-        # 如果有乘客可以登车则进行登车
-        update_cus_values = []
-        update_car_values = []
-        for row in cus_data:
-            # 把乘客目的地输入到图数据中
-            cus_id = row[0]
-            car_id = row[5]
-            cus_id_G_O = prefix_cus_O + cus_id
-            car_id_G_D = prefix_cus_D + row[5]
-            simulation_G.Updata_G_nodes(nodes_data=cus, nodes_notes=prefix_cus_D, **kwargs)
-            length, task_path = simulation_G.Get_Shortest_Car_To_Cus_Path(
-                G=G,
-                car_names=[cus_id_G_O],  # 符合条件的车辆编号们
-                cus_name=car_id_G_D,  # 目标乘客 cusa_name
-                weight='shape_len',  # 计算最短路径的权重名称，有三类（weight， shape_len， wgs84_length）
-                weight_limit=weight_limit,  # 计算最短路径的权重名称，有三类（weight， shape_len， wgs84_length）
-                **kwargs
-            )
-            # 有效载客距离
-            _, task_pmtd = task_path['shape_len'][-1]
-            # 元组形式更新
-            # mysql table: orderdata cols
-            # CUS_STATE, GET_ON_TIME, PMTD, CUS_ID
-            update_cus_values.append((3, now_time, task_pmtd, cus_id))
-            # mysql table: cardata cols
-            # CAR_STATE, TASK_PMTD, TASK_GET_ON_TIME, TASK_PATH_ID, TASK_PATH, CAR_ID
-            update_car_values.append((2, task_pmtd, now_time, 0, task_path, car_id))
-        # orderdata
-        sql_update = f"UPDATE {ordertable} SET CUS_STATE = %s, GET_ON_TIME = %s, PMTD = %s WHERE CUS_ID = %s"
-        cursor.executemany(sql_update, update_cus_values)
-        conn.commit()
-        # cardata
-        sql_update = f"UPDATE {cartable} SET CAR_STATE = %s, TASK_PMTD = %s, TASK_GET_ON_TIME = %s, " \
-                     f"TASK_PATH_ID = %s, TASK_PATH = %s WHERE CAR_ID = %s"
-        cursor.executemany(sql_update, update_car_values)
-        conn.commit()
-    else:
-        pass
-    time_list.append(time.perf_counter())
-    log.write_data(f'{operation_name}完成，乘客人数{len(cus_ids)}， 耗时 {time_list[-1] - time_list[-2]:.2f} s')
-
-
 def Vehicle_Operation(**kwargs):
+    """
+        对当前数据库中运行车辆进行数据更新
+        |---------------runtime-------------->
+        |-nowtime-|---------unit_time--------|
+        |-nowtime-|-used_time-|-unused_time--|
+        计算完后更新
+    :param kwargs:
+    :return:
+    """
     operation_name = '模拟器车辆运行'
     time_list = [time.perf_counter()]
     G = kwargs['_G_']
@@ -208,7 +287,6 @@ def Vehicle_Operation(**kwargs):
     unit_time = kwargs['_config_'].get('PARAMETERS', 'unit_time')
 
     # 更新驶向乘客所在地的车辆信息，如果车辆到达则更新信息
-    task_path = 0
     # CAR_ID, LON, LAT, FIR_PT_N, LST_PT_N, TASK_GET_ON_TIME, TASK_PATH_ID, TASK_PATH
     cols = ['CAR_ID', 'LON', 'LAT',
             'FIR_PT_N', 'LST_PT_N',
@@ -232,9 +310,9 @@ def Vehicle_Operation(**kwargs):
             fir_pt_n = row[3]
             lst_pt_n = row[4]
             if car_state == 1:
-                runtime = now_time - row[5]
+                runtime = now_time + unit_time - row[5]
             else:
-                runtime = now_time - row[6]
+                runtime = now_time + unit_time - row[6]
             task_path_id = row[7]
             task_path = row[8]
             # 更新车辆位置
@@ -246,7 +324,7 @@ def Vehicle_Operation(**kwargs):
             new_task_path_id = task_path_id
             # 本次车辆运行的所剩时间、距离、耗时
             travel = {
-                'unit_time': unit_time,
+                'unused_time': unit_time,
                 'dis': 0,
                 'time': 0
             }
@@ -256,16 +334,25 @@ def Vehicle_Operation(**kwargs):
                 new_task_path_id += 1
                 # 抵达下一段路口(nodes)必须行驶的总时间为eta
                 # Estimated Time of Arrival
-                eta = task_path['path'][new_task_path_id][1]
+                eta1 = task_path['time_len'][new_task_path_id - 1]
+                eta2 = task_path['time_len'][new_task_path_id]
                 # 完成该段道路的移动所需时间为move_time
-                move_time = task_path['time_len'][new_task_path_id] - task_path['time_len'][new_task_path_id - 1]
-                if runtime < eta:
-                    # 如果小于该段路的行驶总时间，则意味着车辆还在任务路径上
-                    # radio意味着node1 -> new_car_loc占据node1 -> node2的比例
-                    radio = (eta - runtime) / move_time
+                required_time_of_path = eta2 - eta1
+                if runtime < eta2:
+                    """车辆未更新道路
+                    如果小于该段路的行驶总时间，则意味着车辆还在任务路径上
+                    radio意味着node1 -> new_car_loc占据node1 -> node2的比例
+                    时间关系如下:
+                        O--------->node1----->car------------>node2
+                        O---eta1--|--required_time_of_path---|
+                        O--------------eta2------------------|
+                    剩余时间/该段时间 = 比例
+                    """
+                    #
+                    radio = travel['unused_time'] / required_time_of_path
                     # 移动的多少
-                    travel['time'] += travel['unit_time']
-                    travel['dis'] += unit_time / move_time * (
+                    travel['time'] += travel['unused_time']
+                    travel['dis'] += travel['unused_time'] / required_time_of_path * (
                             task_path['shape_len'][new_task_path_id] - task_path['shape_len'][new_task_path_id - 1])
                     # 如果当前时间小于行驶到路口的总时间，则意味着在该道路中间
                     # 判断当前车辆是否更换道路
@@ -294,17 +381,21 @@ def Vehicle_Operation(**kwargs):
                                                                                   radio=radio)
                         if car_state == 1:
                             # (+)意味着在原有数值上面更改，否则是替换
-                            # LON, LAT, LOG_TIME, ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+), ALL_RUN_TIME(+),
+                            # LON, LAT, LOG_TIME,
+                            # ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+), ALL_RUN_TIME(+),
                             # ALL_DH_TIME_P(+), TASK_ALL_MILEAGE(+), TASK_DH_MILEAGE(+), TASK_NOW_MILEAGE(+),
                             # CAR_ID
-                            new_data = (new_lon, new_lat, now_time, travel['dis'], travel['dis'], travel['time'],
+                            new_data = (new_lon, new_lat, now_time + unit_time,
+                                        travel['dis'], travel['dis'], travel['time'],
                                         travel['time'], travel['dis'], travel['dis'], travel['dis'],
                                         car_id)
                         else:
-                            # LON, LAT, LOG_TIME, ALL_RUN_MILEAGE(+), ALL_PMTD(+), ALL_RUN_TIME(+),
+                            # LON, LAT, LOG_TIME,
+                            # ALL_RUN_MILEAGE(+), ALL_PMTD(+), ALL_RUN_TIME(+),
                             # TASK_ALL_MILEAGE(+), TASK_PMTD(+), TASK_NOW_MILEAGE(+),
                             # CAR_ID
-                            new_data = (new_lon, new_lat, now_time, travel['dis'], travel['dis'], travel['time'],
+                            new_data = (new_lon, new_lat, now_time + unit_time,
+                                        travel['dis'], travel['dis'], travel['time'],
                                         travel['dis'], travel['dis'], travel['dis'],
                                         car_id)
                         car_records_updata_loc.append(new_data)
@@ -337,11 +428,13 @@ def Vehicle_Operation(**kwargs):
                         if car_state == 1:
                             # (+)意味着在原有数值上面更改，否则是替换
                             # FIR_PT_N, LST_PT_N
-                            # LON, LAT, LOG_TIME, ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+), ALL_RUN_TIME(+),
+                            # LON, LAT, LOG_TIME,
+                            # ALL_RUN_MILEAGE(+), ALL_DH_MILEAGE_P(+), ALL_RUN_TIME(+),
                             # ALL_DH_TIME_P(+), TASK_ALL_MILEAGE(+), TASK_DH_MILEAGE(+), TASK_NOW_MILEAGE(+),
                             # TASK_PATH_ID, CAR_ID
                             new_data = (fir_node, lst_node,
-                                        new_lon, new_lat, now_time, travel['dis'], travel['dis'], travel['time'],
+                                        new_lon, new_lat, now_time + unit_time,
+                                        travel['dis'], travel['dis'], travel['time'],
                                         travel['time'], travel['dis'], travel['dis'], travel['dis'],
                                         new_task_path_id - 1, car_id)
                         else:
@@ -350,29 +443,33 @@ def Vehicle_Operation(**kwargs):
                             # TASK_ALL_MILEAGE(+), TASK_PMTD(+), TASK_NOW_MILEAGE(+),
                             # TASK_PATH_ID, CAR_ID
                             new_data = (fir_node, lst_node,
-                                        new_lon, new_lat, now_time, travel['dis'], travel['dis'], travel['time'],
+                                        new_lon, new_lat, now_time + unit_time,
+                                        travel['dis'], travel['dis'], travel['time'],
                                         travel['dis'], travel['dis'], travel['dis'],
                                         new_task_path_id - 1, car_id)
                         car_records_updata_road.append(new_data)
                         # 更新完成，结束循环
                         break
                 else:
-                    # 上次运行的时间
-                    runtime0 = runtime - travel['unit_time']
+                    """
+                    意味着此时车辆已经驶过路段节点
+                    时间关系如下
+                        O--------------runtime--------------->car(new)
+                        O---->car(old)---->node1------------->car(new)
+                        O-------eta2------|
+                        O----|---------unused_time-----------|
+                        O----|-used_time--|
+                    """
+                    used_time = eta2 - (runtime - travel['unused_time'])
                     #  如果大于等于该段路的行驶总时间，则意味着车辆离开该段路
                     if new_task_path_id == task_path_id_end:
                         # 如果此时刚刚好处于最后一个路径，则意味着车辆已经抵达目的地
-                        # 运行时间减去上次时间，等于上次更新的时间runtime2
-                        # runtime0  | -------->
-                        # runtime   | -------->-unit-->
-                        # point     | -------->->A---->
-                        # t_dis               |--|
-                        t_dis = eta - runtime0
-                        travel['unit_time'] -= t_dis
+                        radio = used_time / required_time_of_path
+                        travel['unused_time'] -= used_time
                         # 移动的多少
-                        travel['time'] += t_dis
-                        travel['dis'] += t_dis / move_time * (task_path['shape_len'][new_task_path_id] -
-                                                              task_path['shape_len'][new_task_path_id - 1])
+                        travel['time'] += used_time
+                        travel['dis'] += radio * (task_path['shape_len'][new_task_path_id] -
+                                                  task_path['shape_len'][new_task_path_id - 1])
                         x = task_path['OD_loc'][-1][0]
                         y = task_path['OD_loc'][-1][1]
                         fir_node = task_path['OD_neighbors'][-1][0]
@@ -390,14 +487,12 @@ def Vehicle_Operation(**kwargs):
                             # TASK_ALL_MILEAGE(+), TASK_DH_MILEAGE(+), TASK_NOW_MILEAGE(+)
                             # CAR_ID
                             new_data = (3, x, y,
-                                        fir_node, lst_node, now_time - t_dis,
+                                        fir_node, lst_node, now_time + travel['time'],
                                         travel['dis'], travel['dis'],
                                         travel['time'], travel['time'],
                                         travel['dis'], travel['dis'], travel['dis'],
                                         car_id)
-                            car_records_updata_task.append(new_data)
                             # 此时循环结束，弹出
-                            break
                         else:
                             # 意味着此时车辆抵达了乘客目的地
                             # car_data
@@ -408,12 +503,13 @@ def Vehicle_Operation(**kwargs):
                             # TASK_PMTD(+), TASK_NOW_MILEAGE(+)
                             # CAR_ID
                             new_data = (4, x, y,
-                                        fir_node, lst_node, now_time - t_dis,
+                                        fir_node, lst_node, now_time + travel['time'],
                                         travel['dis'], travel['dis'],
                                         travel['time'], travel['dis'],
                                         travel['dis'], travel['dis'],
                                         car_id)
                         car_records_updata_task.append(new_data)
+                        break
                     else:
                         # 意味着此时车辆达到了任务路径的下一段道路
                         pass

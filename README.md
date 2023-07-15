@@ -47,6 +47,7 @@
 - **TASK_NOW_MILEAGE** 当前任务行驶距离
 - **TASK_ACCEPTANCE_TIME** 订单接受的时间
 - **TASK_GET_ON_TIME** 订单乘客上车的时间
+- **TASK_GET_OFF_TIME** 订单乘客下车的时间
 - **TASK_PATH_ID** 当前所处的巡航规划ID
 - **TASK_PATH** 当前任务的任务路径
 
