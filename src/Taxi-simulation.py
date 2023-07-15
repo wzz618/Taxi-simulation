@@ -30,10 +30,10 @@ class TaxiSimulation:
         run_times = int(self._config_.get('PARAMETERS', 'run_times'))
         unit_time = int(self._config_.get('PARAMETERS', 'unit_time'))
         # 按照时间间隔逐步迭代
-        while self._now_time_ < run_times:
+        while self._now_time_ <= run_times:
             # 当前进度提醒
             tip = f"进度 {self._now_time_}/{self._config_.get('PARAMETERS', 'run_times')}"
-            self._log_.write_tip(tip=tip, scale=3)
+            self._log_.write_tip(tip=tip, scale=2)
 
             # 乘客更新
             simulation_run.Customer_Appear(**self.__dict__)

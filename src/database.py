@@ -12,6 +12,7 @@ def MySQLCONNECTION(config):
             password=config.get('MYSQL', 'password'),  # 密码
             database=config.get('MYSQL', 'database')  # 数据库
         )
+        _conn_.autocommit(False)
         return _conn_
     except pymysql.err.OperationalError:
         # 如果数据库不存在则创建

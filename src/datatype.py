@@ -48,6 +48,12 @@ orderdata = {
     'PMTD': float,
 }
 
+SQL_Index = {
+    'car_data': ['CAR_ID', 'CAR_STATE'],
+    'order_data': ['CUS_ID', 'CAR_ID', 'CUS_STATE', 'APPEARANCE_TIME'],
+    'map_data': []
+}
+
 
 def sql_vehicle_operation(sql_table: str, updata_type: str, car_state: int) -> str:
     """
@@ -112,7 +118,7 @@ def sql_vehicle_operation(sql_table: str, updata_type: str, car_state: int) -> s
                 SET FIR_PT_N = %s, LST_PT_N = %s, 
                     LON = %s, LAT = %s, LOG_TIME = %s, 
                     ALL_RUN_MILEAGE = ALL_RUN_MILEAGE + %s, ALL_PMTD = ALL_PMTD + %s, ALL_RUN_TIME = ALL_RUN_TIME + %s,
-                    TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s, TASK_PMTD = TASK_PMTD + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s, 
+                    TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s, TASK_PMTD = TASK_PMTD + %s, TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s, TASK_PATH_ID = %s 
                 WHERE CAR_ID = %s
                 """
     else:
@@ -133,7 +139,7 @@ def sql_vehicle_operation(sql_table: str, updata_type: str, car_state: int) -> s
                     ALL_RUN_MILEAGE = ALL_RUN_MILEAGE + %s, ALL_DH_MILEAGE_P = ALL_DH_MILEAGE_P + %s,
                     ALL_RUN_TIME = ALL_RUN_TIME + %s, ALL_DH_TIME_P = ALL_DH_TIME_P + %s,
                     TASK_ALL_MILEAGE = TASK_ALL_MILEAGE + %s, TASK_DH_MILEAGE = TASK_DH_MILEAGE + %s, 
-                    TASK_GET_ON_TIME = %s
+                    TASK_NOW_MILEAGE = TASK_NOW_MILEAGE + %s, TASK_GET_ON_TIME = %s 
                 WHERE CAR_ID = %s
             """
         else:

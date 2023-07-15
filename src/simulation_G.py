@@ -25,13 +25,15 @@ def Updata_G_nodes(
     for row in nodes_data:
         # row 0 -> 4
         # cardata ||
-        # cusdata || CUS_ID, FIR_L_N, LST_L_N, ON_LON, ON_LAT
+        # cusdata || CUS_ID, FIR_PT_N, LST_PT_N, ON_LON, ON_LAT
         # 更新点
-        G.add_node(nodes_notes + str(row[0]), x=row[3], y=row[4])
+        x = row[3]
+        y = row[4]
+        G.add_node(nodes_notes + str(row[0]), x=x, y=y)
         # 更新边
         edge_attrs_1, edge_attrs_2 = Compute_new_edges_attrs(
             G=G,
-            point_loc=[row[3], row[4]],
+            point_loc=[x, y],
             point_name=nodes_notes + str(row[0]),
             fir_point_name=row[1],
             lst_point_name=row[2],
@@ -73,7 +75,6 @@ def Compute_new_edges_attrs(
     # 1: fst -> mid
     # 2: mid -> mid
     """
-    print(f"{fir_point_name}, {lst_point_name}")
     line_attrs = G[fir_point_name][lst_point_name]
     shape_len1 = line_attrs['shape_len'] * radio
     shape_len2 = line_attrs['shape_len'] - shape_len1
@@ -215,12 +216,13 @@ def Path_To_Task_path(G, path: list, weights: list):
     end_pt = G.nodes[path[-1]]
     task_path['OD_loc'] = [[start_pt['x'], start_pt['y']],
                            [end_pt['x'], end_pt['y']]]
+
     # OD_neighbors
-    task_path['OD_neighbors'] = [[start_pt['fir_pt_n'], start_pt['lst_pt_n']],
-                                 [end_pt['fir_pt_n'], end_pt['lst_pt_n']]]
+    task_path['OD_neighbors'] = [list(G.neighbors(path[0])), list(G.neighbors(path[-1]))]
+
     # 检查正确顺序
-    if path[1] == start_pt['fir_pt_n']:
+    if path[1] != task_path['OD_neighbors'][0][-1]:
         task_path['OD_neighbors'][0] = task_path['OD_neighbors'][0][::-1]
-    if path[-2] != end_pt['fir_pt_n']:
+    if path[-2] != task_path['OD_neighbors'][1][-1]:
         task_path['OD_neighbors'][1] = task_path['OD_neighbors'][1][::-1]
     return task_path

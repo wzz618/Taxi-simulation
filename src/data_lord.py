@@ -8,6 +8,7 @@ import geopandas as gpd
 import pandas as pd
 
 import database
+import datatype
 import log_management
 
 _name_ = 'data_lord'
@@ -27,6 +28,7 @@ def Lord(config):
     Lord_Cardata(config)
     Lord_Orderdata(config)
     Lord_Mapdata(config)
+    # ImprovingIndex(config)
 
 
 def Lord_Cardata(config):
@@ -99,6 +101,33 @@ def Lord_Mapdata(config):
     log.write_data(f'数据库表名： {map_data_table}')
 
 
+def ImprovingIndex(config):
+    operation_name = '优化索引'
+    time_list = [time.perf_counter()]
+    table_names = [config.get('MYSQL', 'car_data'),
+                   config.get('MYSQL', 'order_data'),
+                   config.get('MYSQL', 'map_data')]
+    log_dir = config.get('LOG', 'dir_path')
+    log = log_management.log_management(log_dir, _name_)
+    log.write_tip(operation_name, scale=2)
+
+    conn = database.MySQLCONNECTION(config)
+    cursor = conn.cursor()
+    for table_name, cols in datatype.SQL_Index.items():
+        if len(cols) == 0:
+            continue
+        else:
+            for col in cols:
+                sql = f"CREATE INDEX idx_{table_name}_{col} ON {table_name} ({col})"
+                cursor.execute(sql)
+    # 提交修改并关闭连接
+    conn.commit()
+    conn.close()
+
+    time_list.append(time.perf_counter())
+    log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
+
+
 if __name__ == '__main__':
     import configparser
 
@@ -107,4 +136,5 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
-    Lord_Orderdata(config)
+    Lord(config)
+    ImprovingIndex(config)

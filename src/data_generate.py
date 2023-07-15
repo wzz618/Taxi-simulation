@@ -355,7 +355,7 @@ def Orderdata_Generate_From_Orderdata(config):
 
     # 计算每一行时间相对于第一行的秒数差
     init_epoch = df_init_orderdata['GET_ON_TIME'].min()
-    df_out_orderdata['GET_ON_TIME'] = (df_init_orderdata['GET_ON_TIME'] - init_epoch) \
+    df_out_orderdata['APPEARANCE_TIME'] = (df_init_orderdata['GET_ON_TIME'] - init_epoch) \
         .dt.total_seconds()
     # df_out_orderdata['GET_OFF_TIME'] = (df_init_orderdata['GET_OFF_TIME'] - init_epoch) \
     #     .dt.total_seconds()
@@ -401,13 +401,13 @@ def Gdata_Generate_From_Mapdata(config):
     # value: nodes_attrs
     nodes_attrs_cols = [{'x': 'start_x', 'y': 'start_y'},
                         {'x': 'end_x', 'y': 'end_y'}]
-    edgs_attrs_cols = ['shape_len', 'wgs84_len', 'fir_pt_n', 'lst_pt_n', 'line_n', 'weight']
+    edgs_attrs_cols = ['shape_len', 'time_len', 'wgs84_len', 'fir_pt_n', 'lst_pt_n', 'line_n', 'weight']
     for index, row in gdf_geodata.iterrows():
         # 添加节点
         G.add_node(row[nodes_cols[0]], **{attr: row[col] for attr, col in nodes_attrs_cols[0].items()})
         G.add_node(row[nodes_cols[1]], **{attr: row[col] for attr, col in nodes_attrs_cols[1].items()})
         # 添加边
-        G.add_edge(row[nodes_cols[1]], row[nodes_cols[1]], **{key: row[key] for key in edgs_attrs_cols})
+        G.add_edge(row[nodes_cols[0]], row[nodes_cols[1]], **{key: row[key] for key in edgs_attrs_cols})
 
     # 保存数据
     with open(Gdata_path, 'wb') as f:
@@ -449,4 +449,4 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
-    Orderdata_Generate_From_Orderdata(config)
+    Cardata_Generate_From_Orderdata(config)
