@@ -1,8 +1,10 @@
 import pickle
+import time
 
 import database
 import log_management
 import simulation_run
+import visualize
 
 _name_ = 'Taxi-Simulation'
 
@@ -22,6 +24,11 @@ class TaxiSimulation:
         with open(self._config_.get('CACHE', 'Gdata_path'), 'rb') as f:
             self._G_ = pickle.load(f)  # 图网络数据
 
+        # 检测加载绘图图层
+        if int(self._config_.get('SWITCH', 'display')) == 1:
+            with open(self._config_.get('CACHE', 'maplayer_path'), 'rb') as f:
+                self._fig_, self._ax_ = pickle.load(f)  # 图网络数据
+
         # 模拟器状态
         self._now_time_ = int(self._config_.get('PARAMETERS', 'now_time'))
 
@@ -29,6 +36,7 @@ class TaxiSimulation:
         # 程序模拟总时间间隔
         run_times = int(self._config_.get('PARAMETERS', 'run_times'))
         unit_time = int(self._config_.get('PARAMETERS', 'unit_time'))
+        time_list = [time.perf_counter()]
         # 按照时间间隔逐步迭代
         while self._now_time_ <= run_times:
             # 当前进度提醒
@@ -46,11 +54,25 @@ class TaxiSimulation:
             self._now_time_ += unit_time
 
             # 上下客人
+            # 先计算下客车辆，否则其节点会保存
             simulation_run.Customer_Boarding(**self.__dict__)
             simulation_run.Customer_Arrival(**self.__dict__)
 
-            # 更新状态
-            self._now_time_ += 1
+            # 绘图
+            if int(self._config_.get('SWITCH', 'display')) == 1:
+                self._fig_, self._ax_, carlayer = visualize.Cardata_Layer(config=self._config_,
+                                                                          fig=self._fig_,
+                                                                          ax=self._ax_,
+                                                                          _cursor_=self._cursor_,
+                                                                          _log_=self._log_)
+                if int(self._config_.get('SWITCH', 'saveplay')) == 1:
+                    visualize.SaveFig(self._config_, self._fig_, self._now_time_, self._log_)
+
+            # 日志记录
+            time_list.append(time.perf_counter())
+            self._log_.pop_now_tip()
+            self._log_.write_data(f'{tip} @ 耗时 {time_list[-1] - time_list[-2]:.2f}s')
+        self._log_.write_data(f'模拟器共计耗时 {time_list[-1] - time_list[0]:.2f}s')
 
 
 if __name__ == '__main__':
@@ -61,5 +83,6 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
+    # data_lord.Lord(config)
     obj = TaxiSimulation(config)
     obj.Run()

@@ -13,6 +13,8 @@ class log_management:
         """
         self._document_path = self.get_document_path(current_dir, doc_name)  # 当前存储文件的路径
         self.is_print = True
+        self._scale_ = 1
+        self._tips_ = []
 
     def get_document_path(self, current_dir, doc_name):
         """
@@ -42,6 +44,7 @@ class log_management:
         for arg in args:  # 依次写入信息
             with open(self._document_path, 'a+') as f:
                 data = strftime("%Y-%m-%d %H:%M:%S") + '\t' + arg + '\n'
+                data = 2 * len(self._tips_) * '\t' + data
                 f.write(data)
                 if self.is_print:
                     print(data, end='')
@@ -52,6 +55,9 @@ class log_management:
         在文件中增加新的标题
         :return:
         """
+        scale = abs(scale)
+        self._scale_ = scale
+        self._tips_.append(self._scale_)
         with open(self._document_path, 'a+') as f:
             if scale == 1:
                 tip = f'{40 * "*"} {tip} {40 * "*"}\n\t时间：{strftime("%Y-%m-%d %H:%M:%S")}\n'
@@ -59,12 +65,20 @@ class log_management:
                 tip = f'{20 * "-"} {tip} || {strftime("%Y-%m-%d %H:%M:%S")} {20 * "-"}\n'
             elif scale == 3:
                 tip = f'{10 * ">"} {tip} @ {strftime("%Y-%m-%d %H:%M:%S")} {10 * "<"}\n'
+            tip = 2 * (len(self._tips_) - 1) * '\t' + tip
             f.write(tip)
             if self.is_print:
                 print(tip, end='')
         return None
 
+    def pop_now_tip(self):
+        if len(self._tips_) != 0:
+            self._tips_.pop()
+            self._scale_ = self._tips_[-1]
+
 
 if __name__ == '__main__':
     obj = log_management()
+    obj.write_tip('100', scale=2)
+    obj.write_tip('100', scale=2)
     obj.write_data('测试信息1', '测试信息2')

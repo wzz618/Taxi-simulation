@@ -25,7 +25,9 @@ def Customer_Appear(**kwargs):
     log.write_tip(tip=operation_name, scale=3)
 
     # 执行更新语句
-    sql = f"UPDATE {ordertable} SET CUS_STATE = 1 WHERE APPEARANCE_TIME <= {now_time} AND APPEARANCE_TIME > {now_time - unit_time}"
+    sql = f"UPDATE {ordertable} " \
+          f"SET CUS_STATE = 1 " \
+          f"WHERE APPEARANCE_TIME <= {now_time} AND APPEARANCE_TIME > {now_time - unit_time}"
     cursor.execute(sql)
     # 提交更改
     conn.commit()
@@ -37,7 +39,8 @@ def Customer_Appear(**kwargs):
     if cus:
         simulation_G.Updata_G_nodes(nodes_data=cus, nodes_notes=prefix_cus_O, **kwargs)
     time_list.append(time.perf_counter())
-    log.write_data(f'{operation_name}完成，乘客出现人数{len(cus)}， 耗时 {time_list[-1] - time_list[-2]:.2f} s')
+    log.write_data(f'{operation_name}完成，目前打车乘客 {len(cus)} 人，共计耗时 {time_list[-1] - time_list[0]:.2f} s')
+    log.pop_now_tip()
 
 
 def Customer_Boarding(**kwargs):
@@ -92,6 +95,8 @@ def Customer_Boarding(**kwargs):
                 weight_limit=99999999999999999,  # 计算最短路径的权重名称，有三类（weight， shape_len， wgs84_length）
                 **kwargs
             )
+            # 移除点，保证图数据的整洁
+            G.remove_nodes_from([cus_id_G_O, cus_id_G_D])
             # 有效载客距离
             task_pmtd = task_path['shape_len'][-1]
             task_time = task_path['time_len'][-1]
@@ -115,7 +120,8 @@ def Customer_Boarding(**kwargs):
     else:
         pass
     time_list.append(time.perf_counter())
-    log.write_data(f'{operation_name}完成，乘客上车人数{len(cus_ids)}， 耗时 {time_list[-1] - time_list[-2]:.2f} s')
+    log.write_data(f'{operation_name}完成，乘客上车人数{len(cus_ids)}， 共计耗时 {time_list[-1] - time_list[0]:.2f} s')
+    log.pop_now_tip()
 
 
 def Customer_Arrival(**kwargs):
@@ -132,11 +138,19 @@ def Customer_Arrival(**kwargs):
     cursor = kwargs['_cursor_']
     ordertable = kwargs['_config_'].get('MYSQL', 'order_data')
     cartable = kwargs['_config_'].get('MYSQL', 'car_data')
+    prefix_car = kwargs['_config_'].get('G', 'prefix_car')
 
     log.write_tip(tip=operation_name, scale=3)
 
+    # 构建参数话查询语句
+    # cardata_table
+    sql = f"SELECT CAR_ID, FIR_PT_N, LST_PT_N, LON, LAT FROM {cartable} WHERE CAR_STATE = 4"
+    cursor.execute(sql)
+    car = cursor.fetchall()
+    if car:
+        simulation_G.Updata_G_nodes(nodes_data=car, nodes_notes=prefix_car, **kwargs)
     # 构建参数化查询语句
-    # orderdata_table:
+    # cardata_table:
     # TASK_CUS_ID, TASK_ALL_MILEAGE, TASK_PMTD, TASK_DH_MILEAGE, TASK_NOW_MILEAGE
     # TASK_ACCEPTANCE_TIME, TASK_GET_ON_TIME
     sql = f"""SELECT TASK_CUS_ID, TASK_PMTD, TASK_DH_MILEAGE, LOG_TIME FROM {cartable} WHERE CAR_STATE = 4"""
@@ -184,7 +198,8 @@ def Customer_Arrival(**kwargs):
     else:
         pass
     time_list.append(time.perf_counter())
-    log.write_data(f'{operation_name}完成，乘客下车人数{len(car_records)}， 耗时 {time_list[-1] - time_list[-2]:.2f} s')
+    log.write_data(f'{operation_name}完成，乘客下车人数{len(car_records)}，共计耗时 {time_list[-1] - time_list[0]:.2f} s')
+    log.pop_now_tip()
 
 
 def Customer_Destribution(**kwargs):
@@ -194,7 +209,7 @@ def Customer_Destribution(**kwargs):
     :param kwargs:
     :return:
     """
-    operation_name = '司机接单数据更新'
+    operation_name = '司机接单'
     time_list = [time.perf_counter()]
     G = kwargs['_G_']
     now_time = kwargs['_now_time_']
@@ -220,10 +235,13 @@ def Customer_Destribution(**kwargs):
     # 当前空余的车辆
     # 如果当前为初始状态，则初始话G中的车辆
     if now_time == int(kwargs['_config_'].get('PARAMETERS', 'now_time')):
+        time_list.append(time.perf_counter())
         sql = f"SELECT CAR_ID, FIR_PT_N, LST_PT_N, LON, LAT FROM {cartable} WHERE CAR_STATE = 0"
         cursor.execute(sql)
         car = cursor.fetchall()
         simulation_G.Updata_G_nodes(nodes_data=car, nodes_notes=prefix_car, **kwargs)
+        time_list.append(time.perf_counter())
+        log.write_data(f'车辆数据初次输入图网络完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
     sql = f"SELECT CAR_ID FROM {cartable} WHERE CAR_STATE = 0"
     cursor.execute(sql)
     car_ids = cursor.fetchall()
@@ -231,6 +249,7 @@ def Customer_Destribution(**kwargs):
     # 如果有乘客并且有空车则进行分配
     if len(cus_ids) != 0:
         # 对每一位乘客分配车辆
+        time_list.append(time.perf_counter())
         for cus_id in cus_ids:
             # 如果无空车则结束
             if len(car_ids_G) != 0:
@@ -251,6 +270,7 @@ def Customer_Destribution(**kwargs):
                 cus_ids.pop(cus_id)
                 continue
             else:
+                # 如果不是，则乘客上车
                 # 如果不是则更新车辆的形式距离task_path
                 car_id_G = task_path["path"][0]
                 task_dh_mileage = task_path['shape_len'][-1]
@@ -263,10 +283,14 @@ def Customer_Destribution(**kwargs):
                 # mysql table: cardata cols
                 # CAR_STATE, TASK_CUS_ID, TASK_DH_MILEAGE, TASK_ACCEPTANCE_TIME, TASK_PATH_ID, TASK_PATH, CAR_ID
                 update_car_values.append((1, cus_id, task_dh_mileage, now_time, 0, task_path_str, car_id))
+                # 及时把车的图移除，防止污染再次注入的时候污染图结构
+                G.remove_node(car_id_G)
                 car_ids_G.remove(car_id_G)
                 cus_ids.remove(cus_id)
         time_list.append(time.perf_counter())
-        log.write_data(f'{operation_name}计算完成， 耗时 {time_list[-1] - time_list[-2]:.2f} s')
+        log.write_data(f'{operation_name}计算完成，'
+                       f'接单人数 {len(update_cus_values)} 人，计算耗时 {time_list[-1] - time_list[-2]:.2f} s，'
+                       f'计算人均耗时{(time_list[-1] - time_list[-2]) / len(update_cus_values):.2f} s,')
     # 如果存在可以更新的数据：
     if len(update_cus_values) != 0:
         # orderdata
@@ -278,8 +302,11 @@ def Customer_Destribution(**kwargs):
                      f"TASK_ACCEPTANCE_TIME = %s, TASK_PATH_ID = %s, TASK_PATH = %s WHERE CAR_ID = %s"
         cursor.executemany(sql_update, update_car_values)
         conn.commit()
+        log.write_data(f'{operation_name}数据库更新完成，'
+                       f'耗时 {time_list[-1] - time_list[-2]:.2f} s')
     time_list.append(time.perf_counter())
-    log.write_data(f'{operation_name}数据库完成，乘客人数{len(update_cus_values)}， 耗时 {time_list[-1] - time_list[0]:.2f} s')
+    log.write_data(f'{operation_name}完成，共计耗时 {time_list[-1] - time_list[0]:.2f} s')
+    log.pop_now_tip()
 
 
 def Vehicle_Operation(**kwargs):
@@ -542,30 +569,31 @@ def Vehicle_Operation(**kwargs):
                         car_records_updata_task.append(new_data)
                         break
                     else:
-                        # 意味着此时车辆达到了任务路径的下一段道路
+                        # 意味着此时车辆行驶到下一段路
                         pass
         time_list.append(time.perf_counter())
-        log.write_data(f'{operation_name} @ {car_states_log[car_state]} 计算完成，耗时 {time_list[-1] - time_list[0]:.2f} s')
+        log.write_data(f'{operation_name} @ {car_states_log[car_state]} 计算完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
         # 更新位置
         sql = datatype.sql_vehicle_operation(cartable, 'updata_loc', car_state)
         cursor.executemany(sql, car_records_updata_loc)
         conn.commit()
         time_list.append(time.perf_counter())
         log.write_data(
-            f'{operation_name} @ {car_states_log[car_state]}.updata_loc 数据库更新完成，耗时 {time_list[-1] - time_list[0]:.2f} s')
+            f'{operation_name} @ {car_states_log[car_state]}.updata_loc 数据库更新完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
         # 更新道路
         sql = datatype.sql_vehicle_operation(cartable, 'updata_road', car_state)
         cursor.executemany(sql, car_records_updata_road)
         conn.commit()
         time_list.append(time.perf_counter())
         log.write_data(
-            f'{operation_name} @ {car_states_log[car_state]}.updata_road 数据库更新完成，耗时 {time_list[-1] - time_list[0]:.2f} s')
+            f'{operation_name} @ {car_states_log[car_state]}.updata_road 数据库更新完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
         # 更新任务
         sql = datatype.sql_vehicle_operation(cartable, 'updata_task', car_state)
         cursor.executemany(sql, car_records_updata_task)
         conn.commit()
         time_list.append(time.perf_counter())
         log.write_data(
-            f'{operation_name} @ {car_states_log[car_state]}.updata_task 数据库更新完成，耗时 {time_list[-1] - time_list[0]:.2f} s')
+            f'{operation_name} @ {car_states_log[car_state]}.updata_task 数据库更新完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
     time_list.append(time.perf_counter())
     log.write_data(f'{operation_name}完成，共计耗时 {time_list[-1] - time_list[0]:.2f} s')
+    log.pop_now_tip()

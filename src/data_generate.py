@@ -35,6 +35,7 @@ def Generate(config):
     Cardata_Generate_From_Orderdata(config)
     Orderdata_Generate_From_Orderdata(config)
     Gdata_Generate_From_Mapdata(config)
+    Maplayer_Generate(config)
 
 
 def Ceodata_Clean(config):
@@ -429,12 +430,16 @@ def Maplayer_Generate(config):
     maplayer_path = config.get('CACHE', 'maplayer_path')
     map_layer_output = config.get('OUTPUT', 'map_layer_output')
 
+    if int(config.get('SWITCH', 'saveplay')) != 1:
+        # 如果不需要绘图则不创建
+        return
+
     log = log_management.log_management(log_dir, _name_)
     log.write_tip(operation_name, scale=2)
 
     # 保存数据
     with open(maplayer_path, 'wb') as f:
-        pickle.dump(fig, f)
+        pickle.dump((fig, ax), f)
     fig.savefig(map_layer_output, dpi=600, bbox_inches='tight')
 
     time_list.append(time.perf_counter())
@@ -449,4 +454,4 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
-    Cardata_Generate_From_Orderdata(config)
+    Maplayer_Generate(config)

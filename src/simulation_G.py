@@ -29,7 +29,11 @@ def Updata_G_nodes(
         # 更新点
         x = row[3]
         y = row[4]
-        G.add_node(nodes_notes + str(row[0]), x=x, y=y)
+        node_name = nodes_notes + str(row[0])
+        if G.has_node(node_name):
+            # 移除节点
+            G.remove_node(node_name)
+        G.add_node(node_name, x=x, y=y)
         # 更新边
         edge_attrs_1, edge_attrs_2 = Compute_new_edges_attrs(
             G=G,
@@ -207,7 +211,10 @@ def Path_To_Task_path(G, path: list, weights: list):
             point1_name = path[i]
             point2_name = path[i + 1]
             # 获取对应的边对象
-            edge = G.edges[point1_name, point2_name]
+            try:
+                edge = G.edges[point1_name, point2_name]
+            except:
+                print('a')
             task_path[weight].append(task_path[weight][-1] + edge[weight])
         # 保证最后一个为整数
         task_path[weight][-1] = int(task_path[weight][-1])

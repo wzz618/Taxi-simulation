@@ -28,7 +28,7 @@ def Lord(config):
     Lord_Cardata(config)
     Lord_Orderdata(config)
     Lord_Mapdata(config)
-    # ImprovingIndex(config)
+    ImprovingIndex(config)
 
 
 def Lord_Cardata(config):
@@ -104,9 +104,6 @@ def Lord_Mapdata(config):
 def ImprovingIndex(config):
     operation_name = '优化索引'
     time_list = [time.perf_counter()]
-    table_names = [config.get('MYSQL', 'car_data'),
-                   config.get('MYSQL', 'order_data'),
-                   config.get('MYSQL', 'map_data')]
     log_dir = config.get('LOG', 'dir_path')
     log = log_management.log_management(log_dir, _name_)
     log.write_tip(operation_name, scale=2)
@@ -137,4 +134,3 @@ if __name__ == '__main__':
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
     Lord(config)
-    ImprovingIndex(config)
