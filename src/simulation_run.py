@@ -32,7 +32,8 @@ def Customer_Appear(**kwargs):
     # 提交更改
     conn.commit()
     # 寻找需要乘车的乘客
-    sql = f"SELECT CUS_ID, ON_FIR_PT_N, ON_LST_PT_N, ON_LON, ON_LAT FROM {ordertable} WHERE CUS_STATE = 1"
+    sql = f"SELECT CUS_ID, ON_FIR_PT_N, ON_LST_PT_N, ON_LON, ON_LAT FROM {ordertable} " \
+          f"WHERE CUS_STATE = 1 AND APPEARANCE_TIME >= {now_time - unit_time} "
     cursor.execute(sql)
     cus = cursor.fetchall()
     # 如果乘车乘客不为0，则添加乘客信息
@@ -267,7 +268,7 @@ def Customer_Destribution(**kwargs):
             )
             # 如果距离该乘客的最近距离超过weight_limit，则意味着该乘客无人可接
             if length is None:
-                cus_ids.pop(cus_id)
+                cus_ids.remove(cus_id)
                 continue
             else:
                 # 如果不是，则乘客上车
@@ -290,7 +291,7 @@ def Customer_Destribution(**kwargs):
         time_list.append(time.perf_counter())
         log.write_data(f'{operation_name}计算完成，'
                        f'接单人数 {len(update_cus_values)} 人，计算耗时 {time_list[-1] - time_list[-2]:.2f} s，'
-                       f'计算人均耗时{(time_list[-1] - time_list[-2]) / len(update_cus_values):.2f} s,')
+                       f'计算人均耗时{(time_list[-1] - time_list[-2]) / (len(update_cus_values) + 0.00001):.2f} s,')
     # 如果存在可以更新的数据：
     if len(update_cus_values) != 0:
         # orderdata

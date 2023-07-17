@@ -347,7 +347,6 @@ def Orderdata_Generate_From_Orderdata(config):
     # 把时间信息转化为s制
     # 将时间字符串转换为 datetime 对象
     df_init_orderdata['GET_ON_TIME'] = pd.to_datetime(df_init_orderdata['GET_ON_TIME'])
-    df_init_orderdata['GET_OFF_TIME'] = pd.to_datetime(df_init_orderdata['GET_OFF_TIME'])
 
     # copy信息
     copy_cols = ['ON_LON', 'ON_LAT', 'OFF_LON', 'OFF_LAT', 'FIR_L_N', 'LST_L_N',
@@ -358,8 +357,6 @@ def Orderdata_Generate_From_Orderdata(config):
     init_epoch = df_init_orderdata['GET_ON_TIME'].min()
     df_out_orderdata['APPEARANCE_TIME'] = (df_init_orderdata['GET_ON_TIME'] - init_epoch) \
         .dt.total_seconds()
-    # df_out_orderdata['GET_OFF_TIME'] = (df_init_orderdata['GET_OFF_TIME'] - init_epoch) \
-    #     .dt.total_seconds()
 
     # 填充空余项
     df_out_orderdata.fillna(0, inplace=True)

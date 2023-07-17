@@ -144,3 +144,5 @@ cython_debug/
 
 !/cache/
 !/ordersheet/20210414.csv
+!/log/
+!/output/

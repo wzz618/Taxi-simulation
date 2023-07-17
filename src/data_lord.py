@@ -106,10 +106,32 @@ def ImprovingIndex(config):
     time_list = [time.perf_counter()]
     log_dir = config.get('LOG', 'dir_path')
     log = log_management.log_management(log_dir, _name_)
+    innodb_buffer_pool_size = eval(config.get('MYSQL', 'innodb_buffer_pool_size'))
     log.write_tip(operation_name, scale=2)
 
     conn = database.MySQLCONNECTION(config)
     cursor = conn.cursor()
+    # 查询缓冲区大小
+    sql = "SHOW VARIABLES LIKE 'innodb_buffer_pool_size'"
+    cursor.execute(sql)
+
+    # 获取查询结果
+    result = cursor.fetchone()
+    buffer_pool_size = eval(result[1]) / (1024 * 1024)  # 获取缓冲区大小值(MB)
+
+    # 设置缓冲区
+    # 默认是128MB
+    if buffer_pool_size != innodb_buffer_pool_size / (1024 * 1024):
+        sql = f"SET GLOBAL innodb_buffer_pool_size = {innodb_buffer_pool_size}"
+        cursor.execute(sql)
+        conn.commit()
+        time_list.append(time.perf_counter())
+        log.write_data(
+            f'已设置缓冲区大小为{innodb_buffer_pool_size / (1024 * 1024 * 1024):.2f} GB，前缓冲区大小为{buffer_pool_size:.2f} MB ')
+    else:
+        log.write_data(f'当前缓冲区大小为{buffer_pool_size / 1024 :.2f} GB，无需改变')
+
+    # 为常用的列设置索引
     for table_name, cols in datatype.SQL_Index.items():
         if len(cols) == 0:
             continue
@@ -133,4 +155,4 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
-    Lord(config)
+    ImprovingIndex(config)

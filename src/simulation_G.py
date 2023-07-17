@@ -176,8 +176,12 @@ def Get_Shortest_Car_To_Cus_Path(
         **kwargs
 ):
     G = kwargs['_G_']
-    length, old_path = nx.multi_source_dijkstra(G=G, sources=set(car_names), target=cus_name,
-                                                weight=weight, cutoff=weight_limit)
+    try:
+        length, old_path = nx.multi_source_dijkstra(G=G, sources=set(car_names), target=cus_name,
+                                                    weight=weight, cutoff=weight_limit)
+    except nx.NetworkXNoPath:
+        length, old_path = None, None
+
     if length is not None:
         new_path = [old_path[0]] + [x for x in old_path[1:-1] if isinstance(x, (int, float))] + [old_path[-1]]
         task_path = Path_To_Task_path(G, new_path, weights=['shape_len', 'time_len'])

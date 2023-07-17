@@ -1,8 +1,10 @@
 import time
 
 import matplotlib
-import matplotlib.pyplot as plt
 
+matplotlib.use('Agg')
+
+import matplotlib.pyplot as plt
 import database
 import log_management
 
@@ -40,7 +42,7 @@ def Creat_Layer(config):
 
     plt.rcParams['font.family'] = ['sans-serif']
     plt.rcParams['font.sans-serif'] = ['SimHei']
-    matplotlib.use('Agg')
+    plt.style.use('fast')
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8, 7), canvas='agg')
     plt.ion()  # 将画图模式改为交互模式，程序遇到plt.show不会暂停，而是继续执行
     # 但是效率比plt.show(block=False)低下
@@ -98,7 +100,7 @@ def Mapdata_Layer(config, fig=None, ax=None, _cursor_=None):
     return fig, ax
 
 
-def Cardata_Layer(config, fig=None, ax=None, _cursor_=None, _log_=None):
+def Cardata_Layer(config, now_time=0, fig=None, ax=None, _log_=None, _cursor_=None):
     if fig is None and ax is None:
         fig, ax = Mapdata_Layer(config)
     if _cursor_ is None:
@@ -111,12 +113,11 @@ def Cardata_Layer(config, fig=None, ax=None, _cursor_=None, _log_=None):
         log = log_management.log_management(log_dir, _name_)
     else:
         log = _log_
-    operation_name = '车辆数据图层生成'
+    operation_name = '车辆数据图层绘制'
     time_list = [time.perf_counter()]
     # 初始参数读入
 
     cartable = config.get('MYSQL', 'car_data')
-    log.write_tip(operation_name, scale=3)
 
     sql = f"SELECT LON, LAT, CAR_STATE FROM {cartable}"
     cursor.execute(sql)
@@ -131,31 +132,31 @@ def Cardata_Layer(config, fig=None, ax=None, _cursor_=None, _log_=None):
     if _cursor_ is None:
         cursor.close()
 
-    if int(config.get('SWITCH', 'showplay')) == 1:
+    if int(config.get('SWITCH', 'saveplay')) == 1:
+        name = config.get('OUTPUT', 'fig_putput') + str(now_time) + '.jpg'
+        plt.savefig(name, format='jpeg', dpi=300, bbox_inches='tight')
         time_list.append(time.perf_counter())
+        time_dis_save = time_list[-1] - time_list[-2]
+
+    if int(config.get('SWITCH', 'showplay')) == 1:
         # 刷新的速度
         # plt.pause(5)
         plt.show(block=False)
         time_list.append(time.perf_counter())
-        log.write_data(f'展示绘图耗时 {time_list[-1] - time_list[-2]:.2f} s')
-
+        time_dis_show = time_list[-1] - time_list[-2]
+    # 移除图层保证清洁
+    car_layer.remove()
     time_list.append(time.perf_counter())
+    log.write_tip(operation_name, scale=3)
+    log.write_data(f'当前时刻{now_time}')
+    log.write_data(f'绘制图层耗时 {time_list[1] - time_list[0]:.2f} s')
+    if int(config.get('SWITCH', 'showplay')) == 1:
+        log.write_data(f'渲染展示耗时 {time_dis_show:.2f} s')
+    if int(config.get('SWITCH', 'saveplay')) == 1:
+        log.write_data(f'保存绘图耗时 {time_dis_save:.2f} s')
     log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[0]:.2f} s')
     log.pop_now_tip()
     return fig, ax, car_layer
-
-
-def SaveFig(config, fig, _now_time_, log):
-    operation_name = '保存绘图'
-    time_list = [time.perf_counter()]
-    log.write_tip(operation_name, scale=3)
-
-    name = config.get('OUTPUT', 'fig_putput') + str(_now_time_) + '.jpg'
-    fig.savefig(name, format='jpeg', dpi=400, bbox_inches='tight')
-
-    time_list.append(time.perf_counter())
-    log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
-    log.pop_now_tip()
 
 
 if __name__ == '__main__':

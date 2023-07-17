@@ -44,7 +44,7 @@ class log_management:
         for arg in args:  # 依次写入信息
             with open(self._document_path, 'a+') as f:
                 data = strftime("%Y-%m-%d %H:%M:%S") + '\t' + arg + '\n'
-                data = 2 * len(self._tips_) * '\t' + data
+                data = len(self._tips_) * '\t' + data
                 f.write(data)
                 if self.is_print:
                     print(data, end='')
@@ -65,7 +65,7 @@ class log_management:
                 tip = f'{20 * "-"} {tip} || {strftime("%Y-%m-%d %H:%M:%S")} {20 * "-"}\n'
             elif scale == 3:
                 tip = f'{10 * ">"} {tip} @ {strftime("%Y-%m-%d %H:%M:%S")} {10 * "<"}\n'
-            tip = 2 * (len(self._tips_) - 1) * '\t' + tip
+            tip = (len(self._tips_) - 1) * '\t' + tip
             f.write(tip)
             if self.is_print:
                 print(tip, end='')
