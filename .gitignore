@@ -139,9 +139,7 @@ dmypy.json
 cython_debug/
 
 !/ordersheet/
-
 !/map/
-
 !/cache/
 !/ordersheet/20210414.csv
 !/log/

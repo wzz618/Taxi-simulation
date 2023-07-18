@@ -18,7 +18,7 @@ import visualize
 _name_ = 'data_generate'
 
 
-def Generate(config):
+def Generate(config=None):
     """
     模拟器所需数据的生成方法
 
@@ -26,6 +26,13 @@ def Generate(config):
 
     :return:
     """
+    if config is None:
+        import configparser
+        config_file = r"config.ini"
+        # 进行文件读取和参数判断的初始化
+        config = configparser.ConfigParser()
+        # READ CONFIG FILE
+        config.read(config_file, encoding="utf-8")
     log_dir = config.get('LOG', 'dir_path')
     log = log_management.log_management(log_dir, _name_)
     log.write_tip(_name_)
@@ -52,7 +59,6 @@ def Ceodata_Clean(config):
     crs_degree = config.get('MAP', 'crs_degree')  # 单位：度
     crs_metre = config.get('MAP', 'crs_metre')  # 单位：米
     Gepdata_path = config.get('MAP', 'map_path')
-    G_path = config.get('MAP', 'G_path')
     weigh_propertion = float(config.get('MAP', 'weigh_propertion'))
     log_dir = config.get('LOG', 'dir_path')
 
@@ -140,12 +146,6 @@ def Ceodata_Clean(config):
     operation_name = '道路节点名称格式化'
     time_list.append(time.perf_counter())
     gdf_geodata.to_file(filename=Gepdata_path, driver='ESRI Shapefile', encoding='utf-8')
-    # 重新构造图结构
-    Undirected_graph = nx.Graph()
-    edges = [(row['geometry'].coords[0], row['geometry'].coords[-1], dict(row)) for _, row in gdf_geodata.iterrows()]
-    Undirected_graph.add_edges_from(edges)
-    with open(G_path, 'wb') as f:
-        pickle.dump(Undirected_graph, f)
     time_list.append(time.perf_counter())
     log.write_data(f'{operation_name}完成，耗时 {time_list[-1] - time_list[-2]:.2f} s')
 
@@ -451,4 +451,4 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
-    Maplayer_Generate(config)
+    Generate(config)

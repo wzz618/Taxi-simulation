@@ -46,6 +46,7 @@ pip install -r requirements.txt
 /map/<地理数据文件夹>/<地理数据原始文件>
 /order/<订单数据原始文件>
 ```
+你可以选择[demo](https://www.trafficwzz.com/download/taxi_simulation_resourse_demo/)里面的原始数据或者自己下载原始数据
 
 <地理数据原始文件>: 来自[openstreetmap](https://www.openstreetmap.org)上下载的地图文件，注意记录对应的球坐标系和投影坐标系。文件必须包含的字段有：
 
@@ -57,13 +58,98 @@ pip install -r requirements.txt
 
 **第三步：填写配置文件的关键内容**
 
-```config
+在config_module.ini设置，并且在设置完后保存为 Taxi-simulation/src/config.ini
 
+```config
+[PARAMETERS]
+now_time = <开始的时间>
+run_times = <运行的总时长:s>
+unit_time = <时间间隔:s>
+search_length = <接单距离限制:m>
+
+[MYSQL]
+user = root
+password = <你的MYSQL数据密码>
+
+[MAP]
+map_path = <地理信息文件(shp)的绝对文件地址>
+crs_degree = <球坐标系标识符>
+crs_metre = <投影坐标系标识符>
+
+[ORDERSHEET]
+path = <订单数据的绝对文件地址>
 ```
 
-## Data
+**第四步：初始化数据**
 
-## mapdata
+下述文件都应在 Taxi-simulation/src 内创建和运行，日志请查看 Taxi-simulation/log
+
+- 初始化文件配置
+
+```python
+import config_initialization
+config_initialization.config_initialization()
+```
+
+- 清洗原始数据，生成仿真数据
+
+```python
+import data_generate
+data_generate.Generate()
+```
+
+- 把仿真数据导入数据库
+
+```python
+import data_lord
+data_lord.Lord()
+```
+
+**第五步：运行仿真**
+
+下述文件都应在 Taxi-simulation/src 内创建和运行
+
+```python
+import Taxi_simulation
+import configparser
+
+config_file = r"config.ini"
+config = configparser.ConfigParser()
+config.read(config_file, encoding="utf-8")
+obj = TaxiSimulation(config)
+obj.Run()
+```
+
+**再次运行仿真**
+
+当你在仿真未结束的时候关闭了程序，但是希望从断点开始运行，你可以根据日志找到最后一次的时间点，然后修改config.ini的 [PARAMETERS] 的 now_time 的值修改，最后运行下述代码，即可从断点开始运行
+
+```python
+import Taxi_simulation
+import configparser
+
+config_file = r"config.ini"
+config = configparser.ConfigParser()
+config.read(config_file, encoding="utf-8")
+obj = TaxiSimulation(config)
+obj.Relord()
+obj.Run()
+```
+
+**重新运行仿真**
+当你想更新数据重新仿真，你需要重新把数据导入到数据库，然后进行第五步。
+
+## 项目贡献者
+
+项目参与者即为贡献者
+
+## 联系方式
+
+github可以私信项目内任一贡献者
+
+## 仿真数据库各参数含义如下
+
+### mapdata
 
 地图数据信息
 

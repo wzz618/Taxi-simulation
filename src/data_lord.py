@@ -155,4 +155,4 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     # READ CONFIG FILE
     config.read(config_file, encoding="utf-8")
-    ImprovingIndex(config)
+    Lord(config)
