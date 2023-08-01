@@ -7,12 +7,15 @@ This project is a feature-rich vehicle dispatch simulation simulator aimed at me
  · Traffic flow analysis
  
  · Ride-hailing (e.g., Uber/Lyft) and taxi operation simulation
+ 
  · Ride-hailing and taxi dispatch algorithm testing
+ 
  · Warehouse logistics simulation
 
 Currently, the program focuses on taxi dispatch as its background scenario.
 
  · By supplying real order data to the simulator, it can automatically generate primary order information.
+ 
  · By utilizing the OpenStreetMap road network file, the simulator can automatically create an accurate map structure, enabling vehicle route planning.
 
 Once the initialization information is obtained, the simulator conducts iterative runs and updates vehicle and order information at each iteration. Furthermore, the simulator can visualize and save the current status of vehicles within the road network, along with information on orders. This allows users to obtain detailed vehicle and order information at different time points. Users have the flexibility to customize settings according to their needs and obtain comprehensive simulation results and data, providing robust support for transportation decision-making and research.
