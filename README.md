@@ -5,6 +5,7 @@
 This project is a feature-rich vehicle dispatch simulation simulator aimed at meeting personalized research needs in transportation. The project supports the following features:
 
  · Traffic flow analysis
+ 
  · Ride-hailing (e.g., Uber/Lyft) and taxi operation simulation
  · Ride-hailing and taxi dispatch algorithm testing
  · Warehouse logistics simulation
