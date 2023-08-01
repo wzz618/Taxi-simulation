@@ -2,7 +2,7 @@
 
 ## Projects Introduction
 
-This project is a feature-rich vehicle dispatch simulation simulator aimed at meeting personalized research needs in transportation. The project supports the following features:
+  This project is a feature-rich vehicle dispatch simulation simulator aimed at meeting personalized research needs in transportation. The project supports the following features:
 
  · Traffic flow analysis
  
@@ -12,20 +12,18 @@ This project is a feature-rich vehicle dispatch simulation simulator aimed at me
  
  · Warehouse logistics simulation
 
-Currently, the program focuses on taxi dispatch as its background scenario.
+  Currently, the program focuses on taxi dispatch as its background scenario.
 
  · By supplying real order data to the simulator, it can automatically generate primary order information.
  
  · By utilizing the OpenStreetMap road network file, the simulator can automatically create an accurate map structure, enabling vehicle route planning.
 
-Once the initialization information is obtained, the simulator conducts iterative runs and updates vehicle and order information at each iteration. Furthermore, the simulator can visualize and save the current status of vehicles within the road network, along with information on orders. This allows users to obtain detailed vehicle and order information at different time points. Users have the flexibility to customize settings according to their needs and obtain comprehensive simulation results and data, providing robust support for transportation decision-making and research.
-## 项目基本介绍
+  Once the initialization information is obtained, the simulator conducts iterative runs and updates vehicle and order information at each iteration. Furthermore, the simulator can visualize and save the current status of vehicles within the road network, along with information on orders. This allows users to obtain detailed vehicle and order information at different time points. Users have the flexibility to customize settings according to their needs and obtain comprehensive simulation results and data, providing robust support for transportation decision-making and research.
 
-本项目是一个功能丰富的出租车/网约车仿真模拟器，旨在满足个性化的交通运输研究需求。该模拟器具有自定义添加和修改运行逻辑的能力，使用户能够灵活地调整仿真环境。
+## Project Background
+  Initially, we aimed to test the impact of a specific ride-hailing dispatch algorithm on its service efficiency. In the early stages of our research, we attempted to use software such as TransCAD, Vissim, and Cube, but they couldn't fully meet our requirements for customizing vehicle operation logic. Consequently, we developed a custom simulator that could cater to our simulation needs and conducted an analysis of the algorithm's operational logic.
 
-通过向该仿真模拟器提供真实订单数据，可自动生成车辆的原始位置信息和原始订单信息。同时，通过使用来自OpenStreetMap的路网文件，自动生成准确的路网图结构，为车辆路径规划提供支持。在获得上述的初始化信息后，模拟器将进行迭代运行，并在每个时间步骤中更新车辆和订单信息。此外，模拟器还能够绘制和保存当前路网内各个车辆的状态，以及订单的信息。这样，用户可以根据需要获取不同时间点的车辆和订单详细信息。
-
-通过这个仿真模拟器，用户可以进行各种交通运输方面的研究。无论是分析交通流量、优化车辆调度、评估截单算法的效果还是进行其他相关研究，该模拟器都提供了丰富的功能和灵活性。用户可以根据自己的需求进行定制化设置，并获得详尽的仿真结果和数据，为交通运输决策和研究提供有力的支持。
+  Building upon this initial work, we optimized and rewrote the architecture of the previous simulator to make it suitable for simulating larger-scale taxi/ride-hailing operations. Our simulator can now handle simulations on a larger scale, including significant road networks (e.g., 50,000 nodes and 500 km of total roads in the case of Xi'an city), a substantial number of vehicles (6,000 vehicles), extended time periods (24 hours), and significant order datasets (260,000 order records).
 
 ## 项目开发环境
 
