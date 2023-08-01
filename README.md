@@ -1,14 +1,20 @@
-# Taxi-simulation
+# Vehicle Dispatch Simulation
 
-## 项目背景
+## Projects Introduction
 
-本项目源于我们小组在研究截单算法时的探索。截单算法是指在订单接受后打破乘客与司机之间的"锁定"
-关系，我们希望了解这种算法对服务效率的影响。在初期的研究中，我们尝试了TransCAD、Vissim、Cube等软件，但它们无法满足我们对自定义车辆运行的需求。
+This project is a feature-rich vehicle dispatch simulation simulator aimed at meeting personalized research needs in transportation. The project supports the following features:
 
-因此，我们进行了当前出租车和网约车运行逻辑的分析，并编写了一套能够满足我们仿真需求的自定义仿真器。本项目在此基础上，对之前模拟器的架构进行了优化和重写，使其适用于较大规模的出租车/网约车运行模拟。
+ · Traffic flow analysis
+ · Ride-hailing (e.g., Uber/Lyft) and taxi operation simulation
+ · Ride-hailing and taxi dispatch algorithm testing
+ · Warehouse logistics simulation
 
-经过初步测试，我们的仿真器已能够满足较大规模的仿真需求。具体而言，它可以处理较大路网（例如西安市区的5万个节点），较大规模车辆（6,000辆），较长时间段（24小时）以及较大的订单数据集（26万份订单数据）。
+Currently, the program focuses on taxi dispatch as its background scenario.
 
+ · By supplying real order data to the simulator, it can automatically generate primary order information.
+ · By utilizing the OpenStreetMap road network file, the simulator can automatically create an accurate map structure, enabling vehicle route planning.
+
+Once the initialization information is obtained, the simulator conducts iterative runs and updates vehicle and order information at each iteration. Furthermore, the simulator can visualize and save the current status of vehicles within the road network, along with information on orders. This allows users to obtain detailed vehicle and order information at different time points. Users have the flexibility to customize settings according to their needs and obtain comprehensive simulation results and data, providing robust support for transportation decision-making and research.
 ## 项目基本介绍
 
 本项目是一个功能丰富的出租车/网约车仿真模拟器，旨在满足个性化的交通运输研究需求。该模拟器具有自定义添加和修改运行逻辑的能力，使用户能够灵活地调整仿真环境。
